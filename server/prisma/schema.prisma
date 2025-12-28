@@ -1,0 +1,92 @@
+// 数据库模型定义
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 机房信息表
+model ComputerRoom {
+  id          String   @id @default(uuid())
+  roomNumber  String   @unique // 机房号，如 "A101"
+  roomName    String?  // 机房中文名称，如 "第四微机室"
+  capacity    Int      // 座位容量
+  location    String?  // 位置信息
+  description String?  // 描述
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  schedules   Schedule[]
+  
+  @@map("computer_rooms")
+}
+
+// 课程/预约记录表
+model Schedule {
+  id            String   @id @default(uuid())
+  computerRoomId String
+  computerRoom  ComputerRoom @relation(fields: [computerRoomId], references: [id], onDelete: Cascade)
+  
+  // 版本管理
+  versionId     String?  // 所属版本ID（导入的课程才有版本，手动预约的没有）
+  version       ScheduleVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+  
+  // 课程信息
+  courseName    String   // 课程名称
+  teacher       String   // 授课教师
+  classes       String   // 上课班级，多个用分号分隔，如 "国贸2301;国贸2302"
+  
+  // 时间信息
+  weekStart     Int      // 起始周次
+  weekEnd       Int      // 结束周次
+  dayOfWeek     Int      // 星期几 (1-7, 1=周一)
+  periodStart   Int      // 起始节次
+  periodEnd     Int      // 结束节次
+  
+  // 元数据
+  source        String   @default("manual") // 来源：import(导入) 或 manual(手动预约)
+  status        String   @default("active") // 状态：active(有效) 或 cancelled(已取消)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([computerRoomId, weekStart, weekEnd, dayOfWeek, periodStart, periodEnd])
+  @@index([versionId])
+  // 防止同一版本中出现完全相同的重复记录（除 id 外字段相同）
+  @@unique([computerRoomId, courseName, teacher, classes, weekStart, weekEnd, dayOfWeek, periodStart, periodEnd, source, versionId])
+  @@map("schedules")
+}
+
+// 用户表
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique // 用户名
+  password  String   // 密码（存储哈希值）
+  role      String   @default("user") // 角色：user(普通用户) 或 admin(管理员)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("users")
+}
+
+// 课表版本表
+model ScheduleVersion {
+  id          String   @id @default(uuid())
+  version     Int      @default(1) // 版本号（自动递增）
+  fileName    String   // 导入的文件名
+  originalFilePath String? // 保存导入时原始文件的服务器路径
+  fileHash    String?  // 文件哈希值（用于检测重复导入）
+  description String?  // 版本描述
+  recordCount Int      @default(0) // 导入的记录数
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  schedules   Schedule[] // 该版本下的所有课程记录
+  
+  @@unique([version])
+  @@map("schedule_versions")
+}
+
