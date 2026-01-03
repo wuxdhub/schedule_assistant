@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 // 统一的响应接口
 interface WeChatResponse {
@@ -87,7 +88,7 @@ export class WeChatFileSender {
     }
   }
 
-  // 构建上传URL
+  // 构建上传URL（企业微信webhook只支持file类型）
   private buildUploadUrl(webhookUrl: string): string {
     const key = this.extractKeyFromWebhook(webhookUrl);
     return `https://qyapi.weixin.qq.com/cgi-bin/webhook/upload_media?key=${encodeURIComponent(key)}&type=file`;
@@ -164,6 +165,7 @@ export class WeChatFileSender {
     }
   }
 
+
   // 上传文件（核心方法）
   async uploadFile(filePath: string): Promise<WeChatResponse> {
     if (!this.isInitialized) {
@@ -177,7 +179,7 @@ export class WeChatFileSender {
       // 检查文件
       const { sizeMB, filename } = this.checkFile(filePath);
       
-      // 获取上传URL
+      // 获取上传URL（企业微信webhook只支持file类型）
       const uploadUrl = this.buildUploadUrl(this.config.webhookUrl);
       
       // 创建FormData
@@ -233,7 +235,7 @@ export class WeChatFileSender {
     }
   }
 
-  // 发送文件消息
+  // 发送文件消息（企业微信webhook只支持文件类型）
   async sendFileMessage(mediaId: string, customText?: string): Promise<WeChatResponse> {
     if (!this.isInitialized) {
       return {
@@ -243,17 +245,14 @@ export class WeChatFileSender {
     }
 
     try {
-      // 发送文件消息
-      const fileMessage = {
-        msgtype: 'file',
-        file: { media_id: mediaId }
-      };
+      // 企业微信webhook只支持文件消息
+      const message = { msgtype: 'file', file: { media_id: mediaId } };
 
       const sendResponse = await this.withRetry(
         async () => {
           return await this.axios.post(
             this.config.webhookUrl,
-            fileMessage,
+            message,
             { timeout: this.config.timeout }
           );
         },
@@ -273,6 +272,78 @@ export class WeChatFileSender {
           return {
             success: true,
             message: '文件消息发送成功'
+          };
+        } else {
+          return {
+            success: false,
+            message: `发送失败: ${data.errmsg || '未知错误'}`
+          };
+        }
+      } else {
+        return {
+          success: false,
+          message: `HTTP错误: ${sendResponse.status}`
+        };
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `发送异常: ${error.message || error}`,
+        error
+      };
+    }
+  }
+
+  // 发送Base64图片消息（尝试直接预览）
+  async sendImageMessage(filePath: string): Promise<WeChatResponse> {
+    if (!this.isInitialized) {
+      return {
+        success: false,
+        message: '企业微信功能未初始化'
+      };
+    }
+
+    try {
+      // 检查是否为图片文件
+      const ext = path.extname(filePath).toLowerCase();
+      const imageExts = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'];
+      if (!imageExts.includes(ext)) {
+        return {
+          success: false,
+          message: '不支持的图片格式'
+        };
+      }
+
+      // 读取图片文件并转换为Base64
+      const imageBuffer = fs.readFileSync(filePath);
+      const base64Image = imageBuffer.toString('base64');
+      
+      // 构造图片消息
+      const message = {
+        msgtype: 'image',
+        image: {
+          base64: base64Image,
+          md5: crypto.createHash('md5').update(imageBuffer).digest('hex')
+        }
+      };
+
+      const sendResponse = await this.withRetry(
+        async () => {
+          return await this.axios.post(
+            this.config.webhookUrl,
+            message,
+            { timeout: this.config.timeout }
+          );
+        },
+        '发送图片消息'
+      );
+
+      if (sendResponse.status === 200) {
+        const data = sendResponse.data;
+        if (data.errcode === 0) {
+          return {
+            success: true,
+            message: '图片消息发送成功'
           };
         } else {
           return {
@@ -336,7 +407,7 @@ export class WeChatFileSender {
     }
   }
 
-  // 完整发送流程（类似Python的send_excel_to_wechat）
+  // 完整发送流程（支持Excel和图片文件）
   async sendExcelFile(
     filePath: string,
     options?: {
@@ -354,23 +425,48 @@ export class WeChatFileSender {
     const cleanFilename = this.formatFilename(originalFilename);
     const fileCreationTime = this.getFileCreationTime(filePath);
     
+    // 检查是否为图片文件
+    const ext = path.extname(filePath).toLowerCase();
+    const isImage = ['.png', '.jpg', '.jpeg', '.gif', '.bmp'].includes(ext);
+    
+    if (isImage) {
+      // 对于图片文件，尝试使用Base64方式发送以实现直接预览
+      const imageResult = await this.sendImageMessage(filePath);
+      
+      if (imageResult.success) {
+        // 图片发送成功，发送提示消息
+        let successContent = `📋 课程表图片已发送完成！\n\n`;
+        successContent += `📁 文件名：${cleanFilename}\n`;
+        if (week) successContent += `🗓 周次：第${week}周\n`;
+        successContent += `⏰ 生成时间：${fileCreationTime}`;
+        
+        if (customMessage) {
+          successContent += `\n\n💬 备注：${customMessage}`;
+        }
+        
+        const textResult = await this.sendTextMessage(successContent);
+        
+        return {
+          success: true,
+          message: '图片发送成功'
+        };
+      } else {
+        // 图片发送失败，降级为文件发送
+        console.warn('图片消息发送失败，降级为文件发送:', imageResult.message);
+      }
+    }
+    
+    // 对于非图片文件或图片发送失败时，使用文件上传方式
     // 1. 上传文件
     const uploadResult = await this.uploadFile(filePath);
     
     if (!uploadResult.success) {
-      // 上传失败，发送文本通知（使用新格式）
+      // 上传失败，发送文本通知
       let fallbackContent = `📋 课程表文件已生成完成！\n\n`;
       fallbackContent += `📁 文件名：${cleanFilename}\n`;
       if (week) fallbackContent += `🗓 周次：第${week}周\n`;
       fallbackContent += `⏰ 生成时间：${fileCreationTime}\n`;
-      fallbackContent += `❌ 上传失败：${uploadResult.message}\n\n`;
-      
-      fallbackContent += `💡 备用获取方法：\n`;
-      
-      const resolvedLocalPath = sharedFilePath ? path.resolve(sharedFilePath) : path.resolve(filePath);
-      fallbackContent += `📂 本地路径：${resolvedLocalPath}\n`;
-      
-      fallbackContent += `🔗 如需重新获取，请联系管理员`;
+      fallbackContent += `❌ 上传失败：${uploadResult.message}`;
       
       if (customMessage) {
         fallbackContent += `\n\n💬 备注：${customMessage}`;
@@ -387,20 +483,13 @@ export class WeChatFileSender {
     const sendResult = await this.sendFileMessage(uploadResult.mediaId!);
     
     if (!sendResult.success) {
-      // 文件消息发送失败，发送文本通知
+      // 消息发送失败，发送文本通知
       let fallbackContent = `📋 课程表文件已生成完成！\n\n`;
       fallbackContent += `📁 文件名：${cleanFilename}\n`;
       if (week) fallbackContent += `🗓 周次：第${week}周\n`;
       fallbackContent += `⏰ 生成时间：${fileCreationTime}\n`;
-      fallbackContent += `❌ 文件发送失败：${sendResult.message}\n\n`;
-      
-      fallbackContent += `💡 备用获取方法：\n`;
-      
-      const resolvedLocalPath2 = sharedFilePath ? path.resolve(sharedFilePath) : path.resolve(filePath);
-      fallbackContent += `📂 本地路径：${resolvedLocalPath2}\n`;
-      
-      fallbackContent += `🔗 如需重新获取，请联系管理员`;
-      
+      fallbackContent += `❌ 文件发送失败：${sendResult.message}`;
+
       if (customMessage) {
         fallbackContent += `\n\n💬 备注：${customMessage}`;
       }
@@ -416,30 +505,23 @@ export class WeChatFileSender {
     let successContent = `📋 课程表文件已发送完成！\n\n`;
     successContent += `📁 文件名：${cleanFilename}\n`;
     if (week) successContent += `🗓 周次：第${week}周\n`;
-    successContent += `⏰ 生成时间：${fileCreationTime}\n\n`;
-    
-    successContent += `💡 备用获取方法：\n`;
-    
-    const resolvedLocalPath3 = sharedFilePath ? path.resolve(sharedFilePath) : path.resolve(filePath);
-    successContent += `📂 本地路径：${resolvedLocalPath3}\n`;
-    
-    successContent += `🔗 如需重新获取，请联系管理员`;
-    
+    successContent += `⏰ 生成时间：${fileCreationTime}`;
+
     if (customMessage) {
       successContent += `\n\n💬 备注：${customMessage}`;
     }
     
     const textResult = await this.sendTextMessage(successContent);
     
-    return textResult.success 
-      ? { 
-          success: true, 
-          message: '文件发送成功', 
-          mediaId: uploadResult.mediaId 
+    return textResult.success
+      ? {
+          success: true,
+          message: '文件发送成功',
+          mediaId: uploadResult.mediaId
         }
-      : { 
-          success: false, 
-          message: `文件已发送，但提示消息发送失败: ${textResult.message}` 
+      : {
+          success: false,
+          message: `文件已发送，但提示消息发送失败: ${textResult.message}`
         };
   }
 }

@@ -6,6 +6,8 @@ import { authenticate, requireAdmin } from '../middleware/auth';
 import fs from 'fs';
 import path from 'path';
 import { uploadAndSendFile } from '../utils/wechat';
+import { createCanvas, registerFont } from 'canvas';
+import sharp from 'sharp';
 
 // 格式化时间戳为 YYYYMMDD_HHMMSS，用于文件名
 function formatTimestampForFilename(date?: Date): string {
@@ -1092,6 +1094,438 @@ router.get('/highlight-by-week/weekday', async (req, res, next) => {
     next(error);
   }
 });
+
+/**
+ * GET /api/export/daily-schedule
+ * 生成指定周次和星期几的单日课表图片并发送到企业微信
+ * query: week=1-30, dayOfWeek=1-7, sendToWechat=true/false
+ */
+router.get('/daily-schedule', async (req, res, next) => {
+  try {
+    const weekParam = req.query.week as string | undefined;
+    const dayOfWeekParam = req.query.dayOfWeek as string | undefined;
+    const sendToWechat = req.query.sendToWechat === 'true';
+    
+    const week = weekParam ? parseInt(weekParam, 10) : NaN;
+    const dayOfWeek = dayOfWeekParam ? parseInt(dayOfWeekParam, 10) : NaN;
+
+    if (!weekParam || Number.isNaN(week) || week < 1 || week > 30) {
+      return res.status(400).json({ error: '无效的周次参数，必须是 1-30 的整数' });
+    }
+
+    if (!dayOfWeekParam || Number.isNaN(dayOfWeek) || dayOfWeek < 1 || dayOfWeek > 7) {
+      return res.status(400).json({ error: '无效的星期参数，必须是 1-7 的整数' });
+    }
+
+    // 获取最新版本过滤条件
+    const versionFilter = await getLatestVersionFilter();
+
+    // 获取所有机房
+    const allRooms = await prisma.computerRoom.findMany({
+      orderBy: { roomNumber: 'asc' }
+    });
+
+    // 获取指定周次和星期几的课表数据
+    const schedules = await prisma.schedule.findMany({
+      where: {
+        status: 'active',
+        dayOfWeek: dayOfWeek,
+        weekStart: { lte: week },
+        weekEnd: { gte: week },
+        ...versionFilter
+      },
+      include: {
+        computerRoom: true
+      },
+      orderBy: [
+        { periodStart: 'asc' }
+      ]
+    });
+
+    // 将课表数据按机房分组
+    const roomScheduleMap = new Map<string, any[]>();
+    schedules.forEach(schedule => {
+      const roomId = schedule.computerRoomId;
+      if (!roomScheduleMap.has(roomId)) {
+        roomScheduleMap.set(roomId, []);
+      }
+      roomScheduleMap.get(roomId)!.push(schedule);
+    });
+
+    // 为所有机房添加课表数据（包括空课表的机房）
+    const roomsWithSchedules = allRooms.map(room => ({
+      ...room,
+      schedules: roomScheduleMap.get(room.id) || []
+    }));
+
+    // 生成单日课表图片（显示所有机房，包括没有课程的）
+    const imageBuffer = await generateDailyScheduleImage(roomsWithSchedules, week, dayOfWeek);
+
+    const dayNames = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+    const filename = `第${week}周${dayNames[dayOfWeek]}课表.png`;
+    
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    res.send(imageBuffer);
+
+    // 如果需要发送到企业微信
+    if (sendToWechat) {
+      try {
+        const tempDir = path.join('uploads', 'shared');
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+        const ts = formatTimestampForFilename();
+        const tempPath = path.join(tempDir, `第${week}周${dayNames[dayOfWeek]}课表_${ts}.png`);
+        fs.writeFileSync(tempPath, imageBuffer);
+        
+        // 异步发送到企业微信
+        (async () => {
+          try {
+            const resSend = await uploadAndSendFile(tempPath, {
+              week,
+              sharedFilePath: path.resolve(tempPath)
+            });
+            console.log('[wechat] uploadAndSendFile result:', resSend);
+          } catch (e) {
+            console.error('[wechat] uploadAndSendFile error:', e);
+          }
+        })();
+      } catch (e) {
+        console.error('后台上传到企业微信失败:', e);
+      }
+    }
+  } catch (error: any) {
+    console.error('生成单日课表时出错:', error);
+    console.error('错误堆栈:', error.stack);
+    next(error);
+  }
+});
+
+/**
+ * 构建单日课表工作簿（支持高亮显示有课的机房）
+ */
+async function buildDailyScheduleWorkbook(rooms: any[], week: number, dayOfWeek: number): Promise<ExcelJS.Workbook> {
+  const workbook = new ExcelJS.Workbook();
+  
+  const titleFont = { name: '宋体', size: 18 };
+  const headerFont = { name: '宋体', size: 12 };
+  const periodFont = { name: '宋体', size: 12 };
+  const normalFont = { name: '宋体', size: 9, color: { argb: 'FF000000' } };
+  const highlightFont = { name: '宋体', size: 9, color: { argb: 'FFFF0000' } }; // 红色高亮
+
+  const thinBorder: ExcelJS.Borders = {
+    top: { style: 'thin' },
+    left: { style: 'thin' },
+    bottom: { style: 'thin' },
+    right: { style: 'thin' },
+    diagonal: { up: false, down: false, style: 'thin', color: { argb: 'FF000000' } }
+  };
+
+  const dayNames = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  const ws = workbook.addWorksheet(`第${week}周${dayNames[dayOfWeek]}课表`);
+
+  // 对机房按名称排序
+  const sortedRooms = [...rooms].sort((a, b) => {
+    const nameA = (a.roomName || a.roomNumber || '').toString();
+    const nameB = (b.roomName || b.roomNumber || '').toString();
+    return sortRoomName(nameA, nameB);
+  });
+
+  // 设置列宽：A列为节次，其余为机房
+  ws.getColumn(1).width = 12;
+  for (let c = 2; c <= sortedRooms.length + 1; c++) {
+    ws.getColumn(c).width = 25;
+  }
+
+  // 标题行
+  const lastCol = sortedRooms.length + 1;
+  ws.mergeCells(1, 1, 1, lastCol);
+  const titleCell = ws.getCell(1, 1);
+  titleCell.value = `第${week}周${dayNames[dayOfWeek]}机房课表`;
+  titleCell.font = titleFont;
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+  // 表头行：节次/时间 + 机房名称（高亮有课的机房）
+  const headerRow = ws.addRow([
+    '节次/时间',
+    ...sortedRooms.map((room) => room.roomName || room.roomNumber)
+  ]);
+  
+  // 高亮有课的机房表头
+  headerRow.eachCell((cell, colNumber) => {
+    if (colNumber === 1) {
+      // 第一列节次/时间
+      cell.font = headerFont;
+    } else {
+      // 机房列
+      const roomIndex = colNumber - 2;
+      const room = sortedRooms[roomIndex];
+      const hasSchedules = room && room.schedules && room.schedules.length > 0;
+      
+      if (hasSchedules) {
+        // 有课程的机房用红色高亮
+        cell.font = { ...headerFont, color: { argb: 'FFFF0000' } };
+      } else {
+        // 没有课程的机房用普通颜色
+        cell.font = headerFont;
+      }
+    }
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  });
+
+  // 构建课程数据：roomIndex -> periodIndex -> schedules[]
+  const scheduleMatrix: Array<Map<number, any[]>> = sortedRooms.map(() => new Map());
+  
+  sortedRooms.forEach((room, roomIndex) => {
+    room.schedules.forEach((schedule: any) => {
+      // 找到课程对应的节次行
+      const targetRowIndexes: number[] = [];
+      for (const range of PERIOD_RANGES) {
+        const overlap = Math.min(schedule.periodEnd, range.end) - Math.max(schedule.periodStart, range.start) + 1;
+        if (overlap > 0) {
+          targetRowIndexes.push(range.rowIndex);
+        }
+      }
+
+      for (const rowIndex of targetRowIndexes) {
+        const scheduleList = scheduleMatrix[roomIndex].get(rowIndex) || [];
+        scheduleList.push(schedule);
+        scheduleMatrix[roomIndex].set(rowIndex, scheduleList);
+      }
+    });
+  });
+
+  // 生成节次行
+  PERIOD_LABELS.forEach((label, periodIndex) => {
+    const row = ws.addRow(new Array(sortedRooms.length + 1).fill(''));
+    const rowRef = ws.getRow(row.number);
+    
+    // 第一列：节次标签
+    const periodCell = rowRef.getCell(1);
+    periodCell.value = label;
+    periodCell.font = periodFont;
+    periodCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+
+    // 其他列：各机房的课程（使用richText支持高亮）
+    sortedRooms.forEach((_, roomIndex) => {
+      const cell = rowRef.getCell(roomIndex + 2);
+      const schedules = scheduleMatrix[roomIndex].get(periodIndex) || [];
+      
+      if (schedules.length > 0) {
+        // 有课程时使用richText格式，支持高亮
+        const richText: ExcelJS.CellRichTextValue['richText'] = [];
+        
+        schedules.forEach((schedule, index) => {
+          const periodText = schedule.periodStart === schedule.periodEnd
+            ? `第${schedule.periodStart}节`
+            : `第${schedule.periodStart}-${schedule.periodEnd}节`;
+          const weekText = schedule.weekStart === schedule.weekEnd
+            ? `{${schedule.weekStart}周}`
+            : `{${schedule.weekStart}-${schedule.weekEnd}周}`;
+          const courseText = `${schedule.courseName}◇${periodText}${weekText}◇${schedule.teacher}◇${schedule.classes}`;
+          
+          // 检查是否应该高亮：当前周次在课程的周次范围内
+          const isHighlight = schedule.weekStart <= week && week <= schedule.weekEnd;
+          const font = isHighlight ? highlightFont : normalFont;
+          
+          const textWithNewline = (index === 0 ? '' : '\n') + courseText;
+          richText.push({ text: textWithNewline, font });
+        });
+        
+        cell.value = { richText };
+        cell.alignment = { wrapText: true, vertical: 'top' };
+      } else {
+        // 没有课程时使用普通格式
+        cell.value = '';
+        cell.font = normalFont;
+        cell.alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
+      }
+    });
+  });
+
+  // 设置边框
+  ws.eachRow((row) => {
+    row.eachCell((cell) => {
+      cell.border = thinBorder;
+      // 确保没有设置字体的单元格使用默认字体
+      if (!cell.font) {
+        cell.font = normalFont;
+      }
+      if (!cell.alignment) {
+        cell.alignment = { wrapText: true, vertical: 'top' };
+      }
+    });
+  });
+
+  return workbook;
+}
+
+/**
+ * 生成单日课表图片
+ */
+async function generateDailyScheduleImage(rooms: any[], week: number, dayOfWeek: number): Promise<Buffer> {
+  const dayNames = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  
+  // 对机房按名称排序
+  const sortedRooms = [...rooms].sort((a, b) => {
+    const nameA = (a.roomName || a.roomNumber || '').toString();
+    const nameB = (b.roomName || b.roomNumber || '').toString();
+    return sortRoomName(nameA, nameB);
+  });
+
+  // 计算画布尺寸
+  const cellWidth = 200;
+  const cellHeight = 80;
+  const headerHeight = 60;
+  const titleHeight = 50;
+  const padding = 20;
+  
+  const canvasWidth = Math.max(1200, (sortedRooms.length + 1) * cellWidth + padding * 2);
+  const canvasHeight = titleHeight + headerHeight + PERIOD_LABELS.length * cellHeight + padding * 2;
+
+  // 创建画布
+  const canvas = createCanvas(canvasWidth, canvasHeight);
+  const ctx = canvas.getContext('2d');
+
+  // 设置背景色
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+  // 设置字体
+  ctx.font = '16px Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // 绘制标题
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 24px Arial, sans-serif';
+  ctx.fillText(`第${week}周${dayNames[dayOfWeek]}机房课表`, canvasWidth / 2, padding + titleHeight / 2);
+
+  // 绘制表格边框
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1;
+
+  const startY = padding + titleHeight;
+  
+  // 绘制表头
+  ctx.font = 'bold 16px Arial, sans-serif';
+  
+  // 节次/时间列表头
+  ctx.fillStyle = '#f0f0f0';
+  ctx.fillRect(padding, startY, cellWidth, headerHeight);
+  ctx.strokeRect(padding, startY, cellWidth, headerHeight);
+  ctx.fillStyle = '#000000';
+  ctx.fillText('节次/时间', padding + cellWidth / 2, startY + headerHeight / 2);
+
+  // 机房列表头
+  sortedRooms.forEach((room, index) => {
+    const x = padding + (index + 1) * cellWidth;
+    const hasSchedules = room && room.schedules && room.schedules.length > 0;
+    
+    // 背景色
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(x, startY, cellWidth, headerHeight);
+    ctx.strokeRect(x, startY, cellWidth, headerHeight);
+    
+    // 文字颜色：有课程的机房用红色高亮
+    ctx.fillStyle = hasSchedules ? '#ff0000' : '#000000';
+    const roomName = room.roomName || room.roomNumber;
+    ctx.fillText(roomName, x + cellWidth / 2, startY + headerHeight / 2);
+  });
+
+  // 构建课程数据矩阵
+  const scheduleMatrix: Array<Map<number, any[]>> = sortedRooms.map(() => new Map());
+  
+  sortedRooms.forEach((room, roomIndex) => {
+    room.schedules.forEach((schedule: any) => {
+      const targetRowIndexes: number[] = [];
+      for (const range of PERIOD_RANGES) {
+        const overlap = Math.min(schedule.periodEnd, range.end) - Math.max(schedule.periodStart, range.start) + 1;
+        if (overlap > 0) {
+          targetRowIndexes.push(range.rowIndex);
+        }
+      }
+
+      for (const rowIndex of targetRowIndexes) {
+        const scheduleList = scheduleMatrix[roomIndex].get(rowIndex) || [];
+        scheduleList.push(schedule);
+        scheduleMatrix[roomIndex].set(rowIndex, scheduleList);
+      }
+    });
+  });
+
+  // 绘制节次行
+  ctx.font = '14px Arial, sans-serif';
+  
+  PERIOD_LABELS.forEach((label, periodIndex) => {
+    const y = startY + headerHeight + periodIndex * cellHeight;
+    
+    // 节次标签列
+    ctx.fillStyle = '#f8f8f8';
+    ctx.fillRect(padding, y, cellWidth, cellHeight);
+    ctx.strokeRect(padding, y, cellWidth, cellHeight);
+    ctx.fillStyle = '#000000';
+    ctx.fillText(label, padding + cellWidth / 2, y + cellHeight / 2);
+
+    // 机房课程列
+    sortedRooms.forEach((_, roomIndex) => {
+      const x = padding + (roomIndex + 1) * cellWidth;
+      const schedules = scheduleMatrix[roomIndex].get(periodIndex) || [];
+      
+      // 背景色
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x, y, cellWidth, cellHeight);
+      ctx.strokeRect(x, y, cellWidth, cellHeight);
+      
+      if (schedules.length > 0) {
+        // 绘制课程内容
+        ctx.textAlign = 'left';
+        ctx.font = '12px Arial, sans-serif';
+        
+        let textY = y + 15;
+        schedules.forEach((schedule) => {
+          const periodText = schedule.periodStart === schedule.periodEnd
+            ? `第${schedule.periodStart}节`
+            : `第${schedule.periodStart}-${schedule.periodEnd}节`;
+          const weekText = schedule.weekStart === schedule.weekEnd
+            ? `{${schedule.weekStart}周}`
+            : `{${schedule.weekStart}-${schedule.weekEnd}周}`;
+          
+          // 检查是否应该高亮
+          const isHighlight = schedule.weekStart <= week && week <= schedule.weekEnd;
+          ctx.fillStyle = isHighlight ? '#ff0000' : '#000000';
+          
+          // 分行显示课程信息
+          const lines = [
+            schedule.courseName,
+            `${periodText}${weekText}`,
+            schedule.teacher,
+            schedule.classes
+          ];
+          
+          lines.forEach((line, lineIndex) => {
+            if (textY + lineIndex * 12 < y + cellHeight - 5) {
+              ctx.fillText(line.substring(0, 15), x + 5, textY + lineIndex * 12);
+            }
+          });
+          
+          textY += lines.length * 12 + 5;
+        });
+        
+        ctx.textAlign = 'center';
+      }
+    });
+  });
+
+  // 转换为PNG缓冲区
+  const buffer = canvas.toBuffer('image/png');
+  
+  // 使用sharp进行图片优化
+  const optimizedBuffer = await sharp(buffer)
+    .png({ quality: 90, compressionLevel: 6 })
+    .toBuffer();
+    
+  return optimizedBuffer;
+}
 
 export default router;
 

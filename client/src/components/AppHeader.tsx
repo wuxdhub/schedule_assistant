@@ -22,7 +22,7 @@ const AppHeader = () => {
     {
       key: '/schedule',
       icon: <CalendarOutlined />,
-      label: '课表管理'
+      label: '课表查询'
     },
     {
       key: '/query',
@@ -41,7 +41,7 @@ const AppHeader = () => {
     {
       key: '/import',
       icon: <UploadOutlined />,
-      label: '数据导入'
+      label: '课表管理'
     }
   ];
 
