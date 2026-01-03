@@ -10,18 +10,31 @@ services:
       POSTGRES_DB: zhinengpaike
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DB_PASSWORD:-123456}
+      # 优化PostgreSQL内存使用
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d
+      - ./postgres.conf:/etc/postgresql/postgresql.conf
     ports:
       - "5432:5432"
     networks:
       - schedule_network
+    # 资源限制 - 数据库分配1GB内存
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d zhinengpaike"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
 
   # 后端服务
   server:
@@ -36,6 +49,8 @@ services:
       NODE_ENV: production
       CORS_ORIGIN: http://localhost:3000
       WECHAT_WEBHOOK_URL: ${WECHAT_WEBHOOK_URL}
+      # Node.js内存优化
+      NODE_OPTIONS: "--max-old-space-size=512"
     volumes:
       - server_uploads:/app/uploads
     ports:
@@ -45,10 +60,19 @@ services:
         condition: service_healthy
     networks:
       - schedule_network
+    # 资源限制 - 后端分配1GB内存
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.8'
+        reservations:
+          memory: 256M
+          cpus: '0.3'
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
-      interval: 30s
-      timeout: 10s
+      interval: 60s
+      timeout: 15s
       retries: 3
 
   # 前端服务
@@ -64,10 +88,19 @@ services:
       - server
     networks:
       - schedule_network
+    # 资源限制 - 前端分配512MB内存
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.2'
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80"]
-      interval: 30s
-      timeout: 10s
+      interval: 60s
+      timeout: 15s
       retries: 3
 
 volumes:
