@@ -37,13 +37,13 @@ function Check-EnvFile {
 
 function Cleanup {
     Write-Host "Stopping existing containers..."
-    $null = & docker compose down --remove-orphans 2>&1
+    $null = & docker compose stop 2>&1
     Write-Host "OK: Cleanup done" -ForegroundColor Green
 }
 
 function Deploy {
-    Write-Host "Building Docker images (first build may take a while)..."
-    & docker compose build --no-cache
+    Write-Host "Building Docker images..."
+    & docker compose build
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Error: Build failed" -ForegroundColor Red
         exit 1

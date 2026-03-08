@@ -1,7 +1,7 @@
-# 后端 Dockerfile
-FROM node:18-alpine
+# ---- builder 阶段 ----
+FROM node:18-alpine AS builder
 
-# 安装系统依赖（canvas 需要）
+# 安装编译头文件（canvas 编译需要）
 RUN apk add --no-cache \
     cairo-dev \
     jpeg-dev \
@@ -13,29 +13,38 @@ RUN apk add --no-cache \
     libjpeg-turbo-dev \
     freetype-dev
 
-# 设置工作目录
 WORKDIR /app
 
-# 复制 package.json 和 package-lock.json
-COPY package*.json ./
+COPY package.json package-lock.json ./
+RUN npm ci
 
-# 安装依赖
-RUN npm ci --omit=dev
-
-# 复制源代码
 COPY . .
+RUN npx prisma generate && npm run build
 
-# 生成 Prisma 客户端
-RUN npx prisma generate
+# 裁剪掉 devDependencies，保留编译好的原生模块
+RUN npm prune --omit=dev
 
-# 构建应用
-RUN npm run build
+# ---- 生产阶段 ----
+FROM node:18-alpine
 
-# 创建上传目录
+# 只装运行时动态库，不需要 -dev 编译头文件
+RUN apk add --no-cache \
+    cairo \
+    jpeg \
+    pango \
+    giflib \
+    pixman \
+    freetype
+
+WORKDIR /app
+
+# 直接从 builder 复制已裁剪的 node_modules（含编译好的 canvas）
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/prisma ./prisma
+COPY package.json ./
+
 RUN mkdir -p uploads/originals uploads/shared
 
-# 暴露端口
 EXPOSE 3001
-
-# 启动应用
-CMD ["npm", "start"]
+CMD ["node", "dist/index.js"]
