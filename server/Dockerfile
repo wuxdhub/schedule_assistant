@@ -1,23 +1,15 @@
 # ---- builder 阶段 ----
 FROM node:18-alpine AS builder
 
-# 安装编译工具链 + canvas 所需头文件
+# 安装编译工具链
 RUN apk add --no-cache \
     python3 make g++ \
-    openssl \
-    cairo-dev \
-    jpeg-dev \
-    pango-dev \
-    musl-dev \
-    giflib-dev \
-    pixman-dev \
-    libjpeg-turbo-dev \
-    freetype-dev
+    openssl
 
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --prefer-offline
 
 COPY . .
 RUN npx prisma generate && npm run build
@@ -28,15 +20,10 @@ RUN npm prune --omit=dev
 # ---- 生产阶段 ----
 FROM node:18-alpine
 
-# 只装运行时动态库，不需要 -dev 编译头文件
+# 只装运行时动态库 + 中文字体
 RUN apk add --no-cache \
     openssl \
-    cairo \
-    jpeg \
-    pango \
-    giflib \
-    pixman \
-    freetype
+    font-noto-cjk
 
 WORKDIR /app
 

@@ -6,7 +6,29 @@ import { authenticate, requireAdmin } from '../middleware/auth';
 import fs from 'fs';
 import path from 'path';
 import { uploadAndSendFile } from '../utils/wechat';
-import { createCanvas, registerFont } from 'canvas';
+import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
+import os from 'os';
+
+// 注册中文字体，兼容 Windows 和 Linux
+(function registerChineseFont() {
+  const platform = os.platform();
+  const candidates =
+    platform === 'win32'
+      ? [
+          'C:\\Windows\\Fonts\\msyh.ttc',   // 微软雅黑
+          'C:\\Windows\\Fonts\\simsun.ttc',  // 宋体
+        ]
+      : [
+          '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
+          '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
+        ];
+  for (const p of candidates) {
+    try {
+      GlobalFonts.registerFromPath(p, 'CJK');
+      break;
+    } catch {}
+  }
+})();
 import sharp from 'sharp';
 
 // 格式化时间戳为 YYYYMMDD_HHMMSS，用于文件名
@@ -1417,7 +1439,7 @@ async function generateDailyScheduleImage(rooms: any[], week: number, dayOfWeek:
   // 需要临时canvas来测量文字宽度
   const tempCanvas = createCanvas(100, 100);
   const tempCtx = tempCanvas.getContext('2d');
-  tempCtx.font = '12px Arial, sans-serif';
+  tempCtx.font = '12px CJK';
 
   // 预计算所有课程的换行结果并缓存，避免绘制时重复测量
   const linesCache = new Map<any, string[]>();
@@ -1472,7 +1494,7 @@ async function generateDailyScheduleImage(rooms: any[], week: number, dayOfWeek:
 
   // 绘制标题
   ctx.fillStyle = '#000000';
-  ctx.font = 'bold 24px Arial, sans-serif';
+  ctx.font = 'bold 24px CJK';
   ctx.fillText(`第${week}周${dayNames[dayOfWeek]}机房课表`, canvasWidth / 2, padding + titleHeight / 2);
 
   ctx.strokeStyle = '#000000';
@@ -1481,7 +1503,7 @@ async function generateDailyScheduleImage(rooms: any[], week: number, dayOfWeek:
   const startY = padding + titleHeight;
 
   // 绘制表头
-  ctx.font = 'bold 16px Arial, sans-serif';
+  ctx.font = 'bold 16px CJK';
 
   ctx.fillStyle = '#f0f0f0';
   ctx.fillRect(padding, startY, cellWidth, headerHeight);
@@ -1509,7 +1531,7 @@ async function generateDailyScheduleImage(rooms: any[], week: number, dayOfWeek:
     const y = currentY;
 
     // 节次标签列
-    ctx.font = '14px Arial, sans-serif';
+    ctx.font = '14px CJK';
     ctx.fillStyle = '#f8f8f8';
     ctx.fillRect(padding, y, cellWidth, rowHeight);
     ctx.strokeRect(padding, y, cellWidth, rowHeight);
@@ -1528,7 +1550,7 @@ async function generateDailyScheduleImage(rooms: any[], week: number, dayOfWeek:
       if (schedules.length > 0) {
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
-        ctx.font = '12px Arial, sans-serif';
+        ctx.font = '12px CJK';
 
         let textY = y + cellPaddingV;
         schedules.forEach((schedule, idx) => {
