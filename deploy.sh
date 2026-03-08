@@ -36,14 +36,12 @@ check_dependencies() {
 
 # 检查环境变量文件
 check_env_file() {
-    if [ ! -f ".env" ]; then
-        echo "警告: .env 文件不存在，将使用默认配置"
-        if [ -f ".env.example" ]; then
-            cp .env.example .env
-            echo "✓ 已从 .env.example 复制生成 .env，请按需修改"
-        fi
-    else
-        echo "✓ 找到 .env 配置文件"
+    if [ -f "server/.env" ]; then
+        cp server/.env .env
+        echo "✓ 已从 server/.env 复制生成 .env"
+    elif [ ! -f ".env" ]; then
+        echo "错误: server/.env 不存在"
+        exit 1
     fi
 }
 

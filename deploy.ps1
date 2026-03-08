@@ -24,14 +24,12 @@ function Check-Dependencies {
 }
 
 function Check-EnvFile {
-    if (-not (Test-Path ".env")) {
-        Write-Host "Warning: .env not found, using defaults" -ForegroundColor Yellow
-        if (Test-Path ".env.example") {
-            Copy-Item ".env.example" ".env"
-            Write-Host "OK: Copied .env.example to .env" -ForegroundColor Green
-        }
-    } else {
-        Write-Host "OK: Found .env file" -ForegroundColor Green
+    if (Test-Path "server\.env") {
+        Copy-Item "server\.env" ".env" -Force
+        Write-Host "OK: Copied server/.env to .env" -ForegroundColor Green
+    } elseif (-not (Test-Path ".env")) {
+        Write-Host "Error: server/.env not found" -ForegroundColor Red
+        exit 1
     }
 }
 
