@@ -20,9 +20,8 @@ RUN npm ci --prefer-offline
 COPY . .
 RUN npx prisma generate && npm run build
 
-# 裁剪掉 devDependencies，但保留 prisma CLI
+# 裁剪掉 devDependencies，保留编译好的原生模块
 RUN npm prune --omit=dev
-RUN npm install prisma --save-dev
 
 # ---- 生产阶段 ----
 FROM node:18-alpine
@@ -46,4 +45,4 @@ COPY package.json ./
 RUN mkdir -p uploads/originals uploads/shared
 
 EXPOSE 3001
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/scripts/initUsers.js && node dist/index.js"]
