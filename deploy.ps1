@@ -93,7 +93,7 @@ function Wait-ForServer {
     Write-Host "Waiting for backend service..."
     $maxAttempts = 30
     for ($i = 1; $i -le $maxAttempts; $i++) {
-        $null = & docker exec schedule_server wget --no-verbose --tries=1 --spider http://localhost:3001/health 2>&1
+        $null = & docker exec schedule_server wget --no-verbose --tries=1 --spider http://localhost:3001/api/health 2>&1
         if ($LASTEXITCODE -eq 0) {
             Write-Host "OK: Backend ready" -ForegroundColor Green
             return

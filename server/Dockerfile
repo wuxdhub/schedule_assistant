@@ -4,6 +4,7 @@ FROM node:18-alpine AS builder
 # 安装编译工具链 + canvas 所需头文件
 RUN apk add --no-cache \
     python3 make g++ \
+    openssl \
     cairo-dev \
     jpeg-dev \
     pango-dev \
@@ -29,6 +30,7 @@ FROM node:18-alpine
 
 # 只装运行时动态库，不需要 -dev 编译头文件
 RUN apk add --no-cache \
+    openssl \
     cairo \
     jpeg \
     pango \

@@ -57,7 +57,7 @@ cleanup() {
 # 构建和启动服务
 deploy() {
     echo "构建 Docker 镜像（首次构建较慢，请耐心等待）..."
-    $DOCKER_COMPOSE build --no-cache
+    $DOCKER_COMPOSE build
 
     echo "启动服务..."
     $DOCKER_COMPOSE up -d
@@ -105,7 +105,7 @@ wait_for_server() {
     local attempt=0
 
     while [ $attempt -lt $max_attempts ]; do
-        if docker exec schedule_server wget --no-verbose --tries=1 --spider http://localhost:3001/health &>/dev/null; then
+        if docker exec schedule_server wget --no-verbose --tries=1 --spider http://localhost:3001/api/health &>/dev/null; then
             echo "✓ 后端服务已就绪"
             return 0
         fi
