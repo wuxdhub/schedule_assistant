@@ -435,7 +435,7 @@ export class WeChatFileSender {
       
       if (imageResult.success) {
         // 图片发送成功，发送提示消息
-        let successContent = `📋 课程表图片已发送完成！\n\n`;
+        let successContent = `📋 课程表图片已发送完成！\n`;
         successContent += `📁 文件名：${cleanFilename}\n`;
         if (week) successContent += `🗓 周次：第${week}周\n`;
         successContent += `⏰ 生成时间：${fileCreationTime}`;

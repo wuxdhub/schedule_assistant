@@ -1,15 +1,15 @@
 # ---- builder 阶段 ----
 FROM node:18-alpine AS builder
 
-# 安装编译头文件（canvas 编译需要）
+# 安装编译工具链 + canvas 所需头文件
 RUN apk add --no-cache \
+    python3 make g++ \
     cairo-dev \
     jpeg-dev \
     pango-dev \
     musl-dev \
     giflib-dev \
     pixman-dev \
-    pangomm-dev \
     libjpeg-turbo-dev \
     freetype-dev
 
