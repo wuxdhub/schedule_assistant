@@ -1,12 +1,18 @@
 # ---- builder 阶段 ----
 FROM node:18-alpine AS builder
 
+# 换国内 apk 镜像源
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+
 # 安装编译工具链
 RUN apk add --no-cache \
     python3 make g++ \
     openssl
 
 WORKDIR /app
+
+# 换国内 npm 镜像源
+RUN npm config set registry https://registry.npmmirror.com
 
 COPY package.json package-lock.json ./
 RUN npm ci --prefer-offline
@@ -19,6 +25,9 @@ RUN npm prune --omit=dev
 
 # ---- 生产阶段 ----
 FROM node:18-alpine
+
+# 换国内 apk 镜像源
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 # 只装运行时动态库 + 中文字体
 RUN apk add --no-cache \
