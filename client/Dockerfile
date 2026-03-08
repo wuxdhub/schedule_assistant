@@ -4,11 +4,11 @@ FROM node:18-alpine AS builder
 # 设置工作目录
 WORKDIR /app
 
-# 复制 package.json 和 package-lock.json
-COPY package*.json ./
+# 复制依赖文件
+COPY package.json package-lock.json ./
 
-# 安装依赖
-RUN npm ci --omit=dev
+# 安装依赖（包含 devDependencies，构建需要 tsc 和 vite）
+RUN npm ci --include=dev
 
 # 复制源代码
 COPY . .
