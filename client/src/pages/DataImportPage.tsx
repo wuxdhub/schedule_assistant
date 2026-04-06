@@ -94,8 +94,9 @@ const DataImportPage = () => {
   };
 
   return (
-    <Card title="数据导入与初始化" style={{ maxWidth: 800, margin: '0 auto' }}>
-      <Space direction="vertical" size="large" style={{ width: '100%' }}>
+    <div>
+      <Card title="数据导入与初始化">
+        <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Alert
           message="导入说明"
           description="请上传教务处提供的Excel格式机房课表文件。系统将自动解析并导入所有课程信息作为初始数据。"
@@ -139,6 +140,7 @@ const DataImportPage = () => {
         )}
       </Space>
     </Card>
+    </div>
   );
 };
 

@@ -113,8 +113,8 @@ const QueryPage = () => {
   ];
 
   return (
-    <Space direction="vertical" size="large" style={{ width: '100%' }}>
-      <Card title="智能查询与筛选">
+    <div>
+      <Card title="智能查询与筛选" style={{ marginBottom: 16 }}>
         <Form
           form={form}
           layout="vertical"
@@ -251,7 +251,7 @@ const QueryPage = () => {
       </Card>
 
       {/* 预约弹窗已移除 */}
-    </Space>
+    </div>
   );
 };
 

@@ -253,7 +253,7 @@ const WeeklyExportPage = () => {
   // 已直接在按钮中调用带 sendToWechat 的导出函数
 
   return (
-    <Card style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div>
       <Space direction="vertical" size="large" style={{ width: '100%' }}>
         <Alert
           message="使用说明"
@@ -633,7 +633,7 @@ const WeeklyExportPage = () => {
           </Space>
         </Card>
       </Space>
-    </Card>
+    </div>
   );
 };
 

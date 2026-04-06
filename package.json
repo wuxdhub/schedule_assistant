@@ -1,7 +1,7 @@
 {
   "name": "zhinengpaike",
   "version": "1.0.0",
-  "description": "机房智能预约与课表管理系统",
+  "description": "机房课表助手",
   "scripts": {
     "dev:server": "cd server && npm run dev",
     "dev:client": "cd client && npm run dev",

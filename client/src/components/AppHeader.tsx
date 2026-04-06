@@ -10,9 +10,9 @@ import {
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 
-const { Header } = Layout;
+const { Sider, Header } = Layout;
 
-const AppHeader = () => {
+const AppSidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, isAdmin } = useAuth();
@@ -22,7 +22,7 @@ const AppHeader = () => {
     {
       key: '/schedule',
       icon: <CalendarOutlined />,
-      label: '课表查询'
+      label: '课表管理'
     },
     {
       key: '/query',
@@ -41,7 +41,7 @@ const AppHeader = () => {
     {
       key: '/import',
       icon: <UploadOutlined />,
-      label: '课表管理'
+      label: '课表上传'
     }
   ];
 
@@ -61,42 +61,86 @@ const AppHeader = () => {
   ];
 
   return (
-    <Header
+    <Sider
+      width={200}
       style={{
-        background: '#fff',
-        padding: '0 24px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+        background: '#001529',
+        overflow: 'auto',
+        height: '100vh',
+        position: 'fixed',
+        left: 0,
+        top: 0,
+        bottom: 0
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', height: '100%' }}>
-        <div
-          style={{
-            fontSize: '20px',
-            fontWeight: 'bold',
-            marginRight: '40px',
-            color: '#1890ff'
-          }}
-        >
-          机房智能预约与课表管理系统
-        </div>
-        <Menu
-          mode="horizontal"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
-          onClick={({ key }) => navigate(key)}
-          style={{ flex: 1, borderBottom: 'none' }}
-        />
-        {user && (
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <Button type="text" icon={<UserOutlined />} style={{ marginLeft: '16px' }}>
-              {user.username} ({user.role === 'admin' ? '管理员' : '普通用户'})
-            </Button>
-          </Dropdown>
-        )}
+      <div
+        style={{
+          height: '64px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#fff',
+          fontSize: '18px',
+          fontWeight: 'bold',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+        }}
+      >
+        机房课表助手
       </div>
+      <Menu
+        mode="inline"
+        selectedKeys={[location.pathname]}
+        items={menuItems}
+        onClick={({ key }) => navigate(key)}
+        style={{ height: 'calc(100% - 64px)', borderRight: 0 }}
+        theme="dark"
+      />
+    </Sider>
+  );
+};
+
+export const AppTopBar = () => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const userMenuItems = [
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: '退出登录',
+      onClick: () => {
+        logout();
+        navigate('/login');
+      }
+    }
+  ];
+
+  return (
+    <Header
+      style={{
+        background: '#fafafa',
+        padding: '0 24px',
+        borderBottom: '1px solid #e8e8e8',
+        display: 'flex',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        position: 'fixed',
+        top: 0,
+        right: 0,
+        left: 200,
+        zIndex: 1
+      }}
+    >
+      {user && (
+        <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
+          <Button type="text" icon={<UserOutlined />}>
+            {user.username} ({user.role === 'admin' ? '管理员' : '普通用户'})
+          </Button>
+        </Dropdown>
+      )}
     </Header>
   );
 };
 
-export default AppHeader;
+export default AppSidebar;
 

@@ -39,7 +39,7 @@ const LoginPage = () => {
       <Card
         title={
           <div style={{ textAlign: 'center', fontSize: '24px', fontWeight: 'bold' }}>
-            机房智能预约与课表管理系统
+            机房课表助手
           </div>
         }
         style={{ width: 450, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}

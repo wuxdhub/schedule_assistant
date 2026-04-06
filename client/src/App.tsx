@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout, Spin } from 'antd';
-import AppHeader from './components/AppHeader';
+import AppSidebar, { AppTopBar } from './components/AppHeader';
 import DataImportPage from './pages/DataImportPage';
 import QueryPage from './pages/QueryPage';
 import SchedulePage from './pages/SchedulePage';
@@ -57,10 +57,13 @@ function AppContent() {
             path="/schedule"
             element={
               <Layout style={{ minHeight: '100vh' }}>
-                <AppHeader />
-                <Content style={{ padding: '24px', background: '#f0f2f5' }}>
-                  <SchedulePage />
-                </Content>
+                <AppSidebar />
+                <Layout style={{ marginLeft: 200 }}>
+                  <AppTopBar />
+                  <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
+                    <SchedulePage />
+                  </Content>
+                </Layout>
               </Layout>
             }
           />
@@ -68,10 +71,13 @@ function AppContent() {
             path="/query"
             element={
               <Layout style={{ minHeight: '100vh' }}>
-                <AppHeader />
-                <Content style={{ padding: '24px', background: '#f0f2f5' }}>
-                  <QueryPage />
-                </Content>
+                <AppSidebar />
+                <Layout style={{ marginLeft: 200 }}>
+                  <AppTopBar />
+                  <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
+                    <QueryPage />
+                  </Content>
+                </Layout>
               </Layout>
             }
           />
@@ -84,40 +90,52 @@ function AppContent() {
             path="/schedule"
             element={
               <Layout style={{ minHeight: '100vh' }}>
-                <AppHeader />
-                <Content style={{ padding: '24px', background: '#f0f2f5' }}>
-                  <ProtectedRoute>
-                    <SchedulePage />
-                  </ProtectedRoute>
-                </Content>
+                <AppSidebar />
+                <Layout style={{ marginLeft: 200 }}>
+                  <AppTopBar />
+                  <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
+                    <ProtectedRoute>
+                      <SchedulePage />
+                    </ProtectedRoute>
+                  </Content>
+                </Layout>
               </Layout>
             }
           />
           <Route path="/query" element={
             <Layout style={{ minHeight: '100vh' }}>
-              <AppHeader />
-              <Content style={{ padding: '24px', background: '#f0f2f5' }}>
-                <ProtectedRoute><QueryPage /></ProtectedRoute>
-              </Content>
+              <AppSidebar />
+              <Layout style={{ marginLeft: 200 }}>
+                <AppTopBar />
+                <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
+                  <ProtectedRoute><QueryPage /></ProtectedRoute>
+                </Content>
+              </Layout>
             </Layout>
           } />
           <Route
             path="/weekly-export"
             element={
               <Layout style={{ minHeight: '100vh' }}>
-                <AppHeader />
-                <Content style={{ padding: '24px', background: '#f0f2f5' }}>
-                  <ProtectedRoute requireAdmin><WeeklyExportPage /></ProtectedRoute>
-                </Content>
+                <AppSidebar />
+                <Layout style={{ marginLeft: 200 }}>
+                  <AppTopBar />
+                  <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
+                    <ProtectedRoute requireAdmin><WeeklyExportPage /></ProtectedRoute>
+                  </Content>
+                </Layout>
               </Layout>
             }
           />
           <Route path="/import" element={
             <Layout style={{ minHeight: '100vh' }}>
-              <AppHeader />
-              <Content style={{ padding: '24px', background: '#f0f2f5' }}>
-                <ProtectedRoute requireAdmin><DataImportPage /></ProtectedRoute>
-              </Content>
+              <AppSidebar />
+              <Layout style={{ marginLeft: 200 }}>
+                <AppTopBar />
+                <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
+                  <ProtectedRoute requireAdmin><DataImportPage /></ProtectedRoute>
+                </Content>
+              </Layout>
             </Layout>
           } />
         </>
