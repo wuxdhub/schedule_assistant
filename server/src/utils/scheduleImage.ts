@@ -152,10 +152,12 @@ export async function generateDailyScheduleImage(
       schedule.periodStart === schedule.periodEnd
         ? `第${schedule.periodStart}节`
         : `第${schedule.periodStart}-${schedule.periodEnd}节`;
+    // 优先使用合并后的周次文本
     const weekText =
-      schedule.weekStart === schedule.weekEnd
+      schedule.__combinedWeekText ||
+      (schedule.weekStart === schedule.weekEnd
         ? `{${schedule.weekStart}周}`
-        : `{${schedule.weekStart}-${schedule.weekEnd}周}`;
+        : `{${schedule.weekStart}-${schedule.weekEnd}周}`);
     const result = wrapText(tempCtx, `${schedule.courseName}◇${periodText}${weekText}◇${schedule.teacher}◇${schedule.classes}`, maxTextWidth);
     linesCache.set(schedule, result);
     return result;
@@ -205,7 +207,12 @@ export async function generateDailyScheduleImage(
 
   sortedRooms.forEach((room, index) => {
     const x = padding + (index + 1) * cellWidth;
-    const hasThisWeek = room?.schedules?.some((s: any) => s.weekStart <= week && week <= s.weekEnd);
+    const hasThisWeek = room?.schedules?.some((s: any) => {
+      if (s.__weekRanges) {
+        return s.__weekRanges.some((r: { start: number; end: number }) => r.start <= week && week <= r.end);
+      }
+      return s.weekStart <= week && week <= s.weekEnd;
+    });
     ctx.fillStyle = '#f0f0f0';
     ctx.fillRect(x, startY, cellWidth, headerHeight);
     ctx.strokeRect(x, startY, cellWidth, headerHeight);
@@ -238,14 +245,18 @@ export async function generateDailyScheduleImage(
         ctx.font = '12px CJK';
         let textY = y + cellPaddingV;
         schedules.forEach((schedule, idx) => {
-          const isHighlight = schedule.weekStart <= week && week <= schedule.weekEnd;
+          const isHighlight = schedule.__weekRanges
+            ? schedule.__weekRanges.some((r: { start: number; end: number }) => r.start <= week && week <= r.end)
+            : schedule.weekStart <= week && week <= schedule.weekEnd;
           ctx.fillStyle = isHighlight ? '#ff0000' : '#000000';
           const lines = getScheduleLines(schedule);
           lines.forEach((line) => {
             ctx.fillText(line, x + cellPaddingH, textY);
             textY += lineHeight;
           });
-          if (idx < schedules.length - 1) textY += lineHeight;
+          if (idx < schedules.length - 1) {
+            textY += lineHeight;
+          }
         });
         ctx.textBaseline = 'middle';
         ctx.textAlign = 'center';

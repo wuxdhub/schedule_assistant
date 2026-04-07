@@ -3,12 +3,12 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   SearchOutlined,
   CalendarOutlined,
-  ExportOutlined,
   UserOutlined,
   LogoutOutlined,
   BookOutlined,
   DatabaseOutlined,
-  BellOutlined
+  BellOutlined,
+  TableOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -19,17 +19,12 @@ const AppSidebar = () => {
   const location = useLocation();
   const { user, logout, isAdmin } = useAuth();
 
-  // 基础菜单项（所有用户共有）
+  // 基础菜单项（普通用户可见）
   const baseMenuItems = [
     {
-      key: '/semester',
-      icon: <BookOutlined />,
-      label: '学期管理'
-    },
-    {
-      key: '/schedule',
-      icon: <CalendarOutlined />,
-      label: '课表管理'
+      key: '/course-query',
+      icon: <TableOutlined />,
+      label: '课程查询'
     },
     {
       key: '/query',
@@ -41,14 +36,19 @@ const AppSidebar = () => {
   // 管理员专用菜单项
   const adminMenuItems = [
     {
+      key: '/semester',
+      icon: <BookOutlined />,
+      label: '学期管理'
+    },
+    {
       key: '/schedule-version',
       icon: <DatabaseOutlined />,
       label: '版本管理'
     },
     {
-      key: '/weekly-export',
-      icon: <ExportOutlined />,
-      label: '周次筛选导出'
+      key: '/schedule',
+      icon: <CalendarOutlined />,
+      label: '课表管理'
     },
     {
       key: '/reminder',
@@ -74,7 +74,7 @@ const AppSidebar = () => {
 
   return (
     <Sider
-      width={200}
+      width={160}
       style={{
         background: '#001529',
         overflow: 'auto',
@@ -139,7 +139,7 @@ export const AppTopBar = () => {
         position: 'fixed',
         top: 0,
         right: 0,
-        left: 200,
+        left: 160,
         zIndex: 1
       }}
     >

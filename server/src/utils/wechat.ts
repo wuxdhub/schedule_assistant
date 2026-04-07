@@ -24,6 +24,7 @@ export class WeChatFileSender {
   private FormData: any = null;
   private config: WeChatConfig;
   private isInitialized = false;
+  private initPromise: Promise<void>;
 
   constructor(config: WeChatConfig) {
     this.config = {
@@ -32,7 +33,7 @@ export class WeChatFileSender {
       maxFileSizeMB: 20,
       ...config
     };
-    this.initialize();
+    this.initPromise = this.initialize();
   }
 
   private async initialize(): Promise<void> {
@@ -44,6 +45,11 @@ export class WeChatFileSender {
     } catch (error) {
       console.warn('企业微信功能依赖未安装，部分功能受限:', error);
     }
+  }
+
+  /** 等待初始化完成，替代固定的 setTimeout */
+  async waitReady(): Promise<void> {
+    await this.initPromise;
   }
 
   // 统一的重试装饰器
@@ -535,7 +541,7 @@ export async function createAndUseSender() {
   });
 
   // 等待初始化完成
-  await new Promise(resolve => setTimeout(resolve, 100));
+  await sender.waitReady();
 }
 
 // 主要的导出函数
@@ -554,8 +560,8 @@ export async function uploadAndSendFile(
   });
   
   // 等待初始化完成
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
+  await sender.waitReady();
+
   return await sender.sendExcelFile(filePath, {
     week: options?.week,
     customMessage: options?.customMessage,

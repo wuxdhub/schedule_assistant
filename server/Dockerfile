@@ -4,10 +4,14 @@ FROM node:18-alpine AS builder
 # 换国内 apk 镜像源
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
-# 安装编译工具链
+# 安装编译工具链 + 时区数据
 RUN apk add --no-cache \
     python3 make g++ \
-    openssl
+    openssl \
+    tzdata
+
+# 设置上海时区
+ENV TZ=Asia/Shanghai
 
 WORKDIR /app
 
@@ -29,10 +33,14 @@ FROM node:18-alpine
 # 换国内 apk 镜像源
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
-# 只装运行时动态库 + 中文字体
+# 只装运行时动态库 + 中文字体 + 时区数据
 RUN apk add --no-cache \
     openssl \
-    font-noto-cjk
+    font-noto-cjk \
+    tzdata
+
+# 设置上海时区
+ENV TZ=Asia/Shanghai
 
 WORKDIR /app
 

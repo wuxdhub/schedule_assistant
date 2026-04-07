@@ -114,7 +114,7 @@ const QueryPage = () => {
 
   return (
     <div>
-      <Card title="智能查询与筛选" style={{ marginBottom: 16 }}>
+      <Card title="空闲机房查询" style={{ marginBottom: 16 }}>
         <Form
           form={form}
           layout="vertical"

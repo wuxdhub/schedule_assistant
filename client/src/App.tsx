@@ -5,12 +5,29 @@ import QueryPage from './pages/QueryPage';
 import SchedulePage from './pages/SchedulePage';
 import SemesterPage from './pages/SemesterPage';
 import ScheduleVersionPage from './pages/ScheduleVersionPage';
-import WeeklyExportPage from './pages/WeeklyExportPage';
 import ReminderPage from './pages/ReminderPage';
+import CourseQueryPage from './pages/CourseQueryPage';
 import LoginPage from './pages/LoginPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 const { Content } = Layout;
+
+const SIDEBAR_WIDTH = 160;
+
+// 统一的页面布局
+function AppLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Layout style={{ minHeight: '100vh' }}>
+      <AppSidebar />
+      <Layout style={{ marginLeft: SIDEBAR_WIDTH }}>
+        <AppTopBar />
+        <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
+          {children}
+        </Content>
+      </Layout>
+    </Layout>
+  );
+}
 
 // 受保护的路由组件
 const ProtectedRoute = ({ children, requireAdmin = false }: { children: React.ReactElement; requireAdmin?: boolean }) => {
@@ -29,14 +46,14 @@ const ProtectedRoute = ({ children, requireAdmin = false }: { children: React.Re
   }
 
   if (requireAdmin && !isAdmin()) {
-    return <Navigate to="/schedule" replace />;
+    return <Navigate to="/course-query" replace />;
   }
 
   return children;
 };
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, loading, isAdmin } = useAuth();
 
   if (loading) {
     return (
@@ -46,141 +63,51 @@ function AppContent() {
     );
   }
 
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
   return (
     <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      {!user ? (
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      ) : user.role === 'user' ? (
-        // 普通用户路由（包含 duty_schedule 功能）
-        <>
-          <Route path="/" element={<Navigate to="/schedule" replace />} />
-          <Route
-            path="/semester"
-            element={
-              <Layout style={{ minHeight: '100vh' }}>
-                <AppSidebar />
-                <Layout style={{ marginLeft: 200 }}>
-                  <AppTopBar />
-                  <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
-                    <SemesterPage />
-                  </Content>
-                </Layout>
-              </Layout>
-            }
-          />
-          <Route
-            path="/schedule"
-            element={
-              <Layout style={{ minHeight: '100vh' }}>
-                <AppSidebar />
-                <Layout style={{ marginLeft: 200 }}>
-                  <AppTopBar />
-                  <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
-                    <SchedulePage />
-                  </Content>
-                </Layout>
-              </Layout>
-            }
-          />
-          <Route
-            path="/query"
-            element={
-              <Layout style={{ minHeight: '100vh' }}>
-                <AppSidebar />
-                <Layout style={{ marginLeft: 200 }}>
-                  <AppTopBar />
-                  <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
-                    <QueryPage />
-                  </Content>
-                </Layout>
-              </Layout>
-            }
-          />
-          <Route path="*" element={<Navigate to="/schedule" replace />} />
-        </>
-      ) : (
-        <>
-          <Route path="/" element={<Navigate to="/schedule" replace />} />
-          <Route
-            path="/semester"
-            element={
-              <Layout style={{ minHeight: '100vh' }}>
-                <AppSidebar />
-                <Layout style={{ marginLeft: 200 }}>
-                  <AppTopBar />
-                  <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
-                    <ProtectedRoute><SemesterPage /></ProtectedRoute>
-                  </Content>
-                </Layout>
-              </Layout>
-            }
-          />
-          <Route
-            path="/schedule"
-            element={
-              <Layout style={{ minHeight: '100vh' }}>
-                <AppSidebar />
-                <Layout style={{ marginLeft: 200 }}>
-                  <AppTopBar />
-                  <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
-                    <ProtectedRoute>
-                      <SchedulePage />
-                    </ProtectedRoute>
-                  </Content>
-                </Layout>
-              </Layout>
-            }
-          />
-          <Route path="/query" element={
-            <Layout style={{ minHeight: '100vh' }}>
-              <AppSidebar />
-              <Layout style={{ marginLeft: 200 }}>
-                <AppTopBar />
-                <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
-                  <ProtectedRoute><QueryPage /></ProtectedRoute>
-                </Content>
-              </Layout>
-            </Layout>
-          } />
-          <Route
-            path="/weekly-export"
-            element={
-              <Layout style={{ minHeight: '100vh' }}>
-                <AppSidebar />
-                <Layout style={{ marginLeft: 200 }}>
-                  <AppTopBar />
-                  <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
-                    <ProtectedRoute requireAdmin><WeeklyExportPage /></ProtectedRoute>
-                  </Content>
-                </Layout>
-              </Layout>
-            }
-          />
-          <Route path="/schedule-version" element={
-            <Layout style={{ minHeight: '100vh' }}>
-              <AppSidebar />
-              <Layout style={{ marginLeft: 200 }}>
-                <AppTopBar />
-                <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
-                  <ProtectedRoute requireAdmin><ScheduleVersionPage /></ProtectedRoute>
-                </Content>
-              </Layout>
-            </Layout>
-          } />
-          <Route path="/reminder" element={
-            <Layout style={{ minHeight: '100vh' }}>
-              <AppSidebar />
-              <Layout style={{ marginLeft: 200 }}>
-                <AppTopBar />
-                <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
-                  <ProtectedRoute requireAdmin><ReminderPage /></ProtectedRoute>
-                </Content>
-              </Layout>
-            </Layout>
-          } />
-        </>
-      )}
+      <Route path="/login" element={<Navigate to="/course-query" replace />} />
+
+      {/* 所有用户可访问 */}
+      <Route path="/" element={<Navigate to="/course-query" replace />} />
+      <Route path="/course-query" element={
+        <AppLayout><CourseQueryPage /></AppLayout>
+      } />
+      <Route path="/query" element={
+        <AppLayout><QueryPage /></AppLayout>
+      } />
+
+      {/* 管理员专用 */}
+      <Route path="/semester" element={
+        <AppLayout>
+          <ProtectedRoute requireAdmin><SemesterPage /></ProtectedRoute>
+        </AppLayout>
+      } />
+      <Route path="/schedule" element={
+        <AppLayout>
+          <ProtectedRoute requireAdmin><SchedulePage /></ProtectedRoute>
+        </AppLayout>
+      } />
+      <Route path="/schedule-version" element={
+        <AppLayout>
+          <ProtectedRoute requireAdmin><ScheduleVersionPage /></ProtectedRoute>
+        </AppLayout>
+      } />
+      <Route path="/reminder" element={
+        <AppLayout>
+          <ProtectedRoute requireAdmin><ReminderPage /></ProtectedRoute>
+        </AppLayout>
+      } />
+
+      <Route path="*" element={<Navigate to="/course-query" replace />} />
     </Routes>
   );
 }
@@ -196,5 +123,3 @@ function App() {
 }
 
 export default App;
-
-

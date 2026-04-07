@@ -1,6 +1,6 @@
 import prisma from '../lib/prisma';
 import { WeChatFileSender } from '../utils/wechat';
-import { generateDailyScheduleImage } from '../utils/scheduleImage';
+import { generateDailyScheduleImage, mergeSchedulesByWeek } from '../utils/scheduleImage';
 import fs from 'fs';
 import path from 'path';
 
@@ -43,10 +43,11 @@ export async function fireReminder(reminderId: string, webhookUrl: string, inter
     ? await prisma.semester.findFirst({ where: { semester: activeVersion.semester } })
     : null;
 
-  // 3. 计算目标日期
+  // 3. 计算目标日期（用本地时间，避免 toISOString() 返回 UTC 导致跨午夜时日期偏移）
   const targetDate = new Date();
   targetDate.setDate(targetDate.getDate() + intervalDays);
-  const targetDateStr = targetDate.toISOString().split('T')[0]; // YYYY-MM-DD
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const targetDateStr = `${targetDate.getFullYear()}-${pad(targetDate.getMonth() + 1)}-${pad(targetDate.getDate())}`;
 
   // 4. 如果有学期信息，检查目标日期是否在学期范围内
   if (semester) {
@@ -66,9 +67,11 @@ export async function fireReminder(reminderId: string, webhookUrl: string, inter
   let dayOfWeek: number;
 
   if (semester) {
+    // 用本地午夜对齐，避免 new Date("YYYY-MM-DD") 被解析为 UTC 0 点导致时区偏差
     const start = new Date(semester.startDate);
     start.setHours(0, 0, 0, 0);
-    const target = new Date(targetDateStr);
+    const target = new Date(targetDate);
+    target.setHours(0, 0, 0, 0);
     const diffDays = Math.floor((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     week = Math.floor(diffDays / 7) + 1;
   } else {
@@ -77,8 +80,8 @@ export async function fireReminder(reminderId: string, webhookUrl: string, inter
     return;
   }
 
-  // dayOfWeek：1=周一...7=周日，JS getDay() 0=周日
-  const jsDay = new Date(targetDateStr).getDay();
+  // dayOfWeek：1=周一...7=周日，JS getDay() 0=周日（直接用 targetDate 本地时间）
+  const jsDay = targetDate.getDay();
   dayOfWeek = jsDay === 0 ? 7 : jsDay;
 
   const dayNames = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
@@ -106,10 +109,14 @@ export async function fireReminder(reminderId: string, webhookUrl: string, inter
     roomScheduleMap.set(s.computerRoomId, list);
   });
 
-  const roomsWithSchedules = allRooms.map((room) => ({
+  const roomsRaw = allRooms.map((room) => ({
     ...room,
     schedules: roomScheduleMap.get(room.id) || []
   }));
+
+  // 合并相同课程的多周次记录（与课程查询页面逻辑一致）
+  const mergedRooms = mergeSchedulesByWeek(roomsRaw);
+  const roomsWithSchedules = mergedRooms;
 
   // 7. 生成图片
   const imageBuffer = await generateDailyScheduleImage(roomsWithSchedules, week, dayOfWeek);
@@ -123,7 +130,7 @@ export async function fireReminder(reminderId: string, webhookUrl: string, inter
 
   // 9. 推送到 reminder.webhookUrl（每条 reminder 独立）
   const sender = new WeChatFileSender({ webhookUrl, maxRetries: 3, timeout: 30000 });
-  await new Promise((r) => setTimeout(r, 100)); // 等待 axios/form-data 初始化
+  await sender.waitReady(); // 等待 axios/form-data 初始化完成
   const result = await sender.sendExcelFile(tempPath, { week });
   console.log(`[reminder] ${reminderId}: 推送结果 ->`, result.message);
 }
@@ -136,8 +143,10 @@ export async function fireReminder(reminderId: string, webhookUrl: string, inter
 async function tick(): Promise<void> {
   try {
     const now = new Date();
-    const currentHHmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const todayStr = now.toISOString().split('T')[0];
+    const padT = (n: number) => String(n).padStart(2, '0');
+    const currentHHmm = `${padT(now.getHours())}:${padT(now.getMinutes())}`;
+    // 用本地日期，避免 toISOString() 返回 UTC 导致凌晨时日期偏移
+    const todayStr = `${now.getFullYear()}-${padT(now.getMonth() + 1)}-${padT(now.getDate())}`;
 
     const reminders = await prisma.reminder.findMany({ where: { isEnabled: true } });
 
@@ -158,10 +167,10 @@ async function tick(): Promise<void> {
       });
     }
 
-    // 清理过期的 firedSet 条目（保留今天的，删除昨天的）
+    // 清理过期的 firedSet 条目（保留今天的，删除昨天的，均用本地日期）
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const yesterdayStr = `${yesterday.getFullYear()}-${padT(yesterday.getMonth() + 1)}-${padT(yesterday.getDate())}`;
     for (const key of firedSet) {
       if (key.includes(yesterdayStr)) firedSet.delete(key);
     }

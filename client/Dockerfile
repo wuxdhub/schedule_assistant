@@ -22,6 +22,15 @@ RUN npm run build
 # 生产阶段 - 使用 nginx 提供静态文件服务
 FROM nginx:alpine
 
+# 换国内 apk 镜像源
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+
+# 安装时区数据并设置上海时区
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone && \
+    apk del tzdata
+
 # 复制构建产物到 nginx 目录
 COPY --from=builder /app/dist /usr/share/nginx/html
 

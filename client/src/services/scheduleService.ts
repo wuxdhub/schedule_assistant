@@ -151,6 +151,16 @@ export const exportHighlightByWeekWeekdayWithSend = async (week: number, sendToW
   }) as Promise<Blob>;
 };
 
+// 获取课表信息（最新版本+学期）
+export const getTimetableInfo = async () => {
+  return api.get('/export/timetable-info');
+};
+
+// 获取完整课表 JSON 数据（合并周次后）
+export const getTimetableJson = async () => {
+  return api.get('/export/timetable-json');
+};
+
 // 导出导入时上传的原始文件（原始 Excel），后端需在上传时保存原文件并提供此接口
 export const exportOriginalFile = async (sendToWechat?: boolean): Promise<Blob> => {
   return api.get('/export/original', {

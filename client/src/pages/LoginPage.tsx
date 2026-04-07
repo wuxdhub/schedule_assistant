@@ -16,7 +16,7 @@ const LoginPage = () => {
 
   const handleUserLogin = async () => {
     await loginAsUser();
-    navigate('/schedule');
+    navigate('/course-query');
   };
 
   const onAdminLogin = async (values: { username: string; password: string }) => {
@@ -24,7 +24,7 @@ const LoginPage = () => {
     const success = await login(values.username, values.password);
     setLoading(false);
     if (success) {
-      navigate('/schedule');
+      navigate('/course-query');
     }
   };
 

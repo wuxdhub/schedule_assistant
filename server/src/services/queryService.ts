@@ -83,19 +83,17 @@ export async function queryAvailableRooms(filter: QueryFilter): Promise<Availabl
     }));
   }
   
-  // 3. 获取最新版本的过滤条件
-  const latestVersion = await prisma.scheduleVersion.findFirst({
-    orderBy: { version: 'desc' }
-  });
+  // 3. 获取启用版本的过滤条件（无启用版本时返回空结果）
+  const activeVersion = await prisma.scheduleVersion.findFirst({ where: { isActive: true } });
 
-  const versionFilter = latestVersion
+  const versionFilter = activeVersion
     ? {
         OR: [
-          { versionId: latestVersion.id },
+          { versionId: activeVersion.id },
           { versionId: null } // 手动预约的课程
         ]
       }
-    : { versionId: null };
+    : { versionId: '__none__' }; // 无启用版本，不返回任何课程
 
   // 4. 获取所有有效的课程安排（只查询最新版本）
   const allSchedules = await prisma.schedule.findMany({
@@ -179,19 +177,17 @@ export async function checkScheduleConflict(
   periodEnd: number,
   excludeScheduleId?: string // 排除的课程ID（用于修改时）
 ): Promise<{ hasConflict: boolean; conflictingSchedule?: any }> {
-  // 获取最新版本的过滤条件
-  const latestVersion = await prisma.scheduleVersion.findFirst({
-    orderBy: { version: 'desc' }
-  });
+  // 获取启用版本的过滤条件（无启用版本时返回空结果）
+  const activeVersion = await prisma.scheduleVersion.findFirst({ where: { isActive: true } });
 
-  const versionFilter = latestVersion
+  const versionFilter = activeVersion
     ? {
         OR: [
-          { versionId: latestVersion.id },
+          { versionId: activeVersion.id },
           { versionId: null } // 手动预约的课程
         ]
       }
-    : { versionId: null };
+    : { versionId: '__none__' }; // 无启用版本，不返回任何课程
 
   const schedules = await prisma.schedule.findMany({
     where: {

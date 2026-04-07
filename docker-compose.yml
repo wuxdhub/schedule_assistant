@@ -13,6 +13,7 @@ services:
       POSTGRES_DB: schedule_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Shanghai
       # 优化PostgreSQL内存使用
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
     volumes:
@@ -51,6 +52,7 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:${DB_PASSWORD}@postgres:5432/schedule_db?schema=public
       NODE_ENV: production
+      TZ: Asia/Shanghai
       CORS_ORIGIN: http://localhost:3000
       NODE_OPTIONS: "--max-old-space-size=512"
     volumes:

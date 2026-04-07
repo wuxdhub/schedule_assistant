@@ -1092,6 +1092,11 @@ export async function importSchedulesToDatabase(
       fileHash = calculateFileHash(filePath);
     }
 
+    // 若新版本设为启用，先关闭其他版本
+    if (options?.isActive) {
+      await prisma.scheduleVersion.updateMany({ data: { isActive: false } });
+    }
+
     const version = await prisma.scheduleVersion.create({
       data: {
         version: nextVersion,

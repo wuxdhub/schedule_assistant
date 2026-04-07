@@ -28,20 +28,19 @@ const router = express.Router();
  * 获取最新版本的过滤条件
  */
 async function getLatestVersionFilter(): Promise<any> {
-  const latestVersion = await prisma.scheduleVersion.findFirst({
-    orderBy: { version: 'desc' }
+  const activeVersion = await prisma.scheduleVersion.findFirst({
+    where: { isActive: true }
   });
-
-  if (latestVersion) {
+  if (activeVersion) {
     return {
       OR: [
-        { versionId: latestVersion.id },
+        { versionId: activeVersion.id },
         { versionId: null }
       ]
     };
-  } else {
-    return { versionId: null };
   }
+  // 没有启用版本：返回不可能匹配的条件，确保查询结果为空
+  return { versionId: '__none__' };
 }
 
 /**
@@ -131,10 +130,27 @@ async function buildHighlightWorkbookByRoom(targetWeek: number) {
     infoCell.font = headerFont;
     infoCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
-    // 第三行：星期表头（删除了空行）
+    // 第三行：星期表头
     const headerRow = ws.addRow(['', '周一', '周二', '周三', '周四', '周五', '周六', '周日']);
-    headerRow.eachCell((cell) => {
-      cell.font = headerFont;
+    headerRow.eachCell((cell, colNumber) => {
+      if (colNumber === 1) {
+        cell.font = headerFont;
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        return;
+      }
+      const day = colNumber - 1; // 列2=周一(1)...列8=周日(7)
+      const dayHasHighlight = targetWeek > 0 && room.schedules.some((s: any) => {
+        if (s.dayOfWeek !== day) return false;
+        if ((s as any).__weekRanges) {
+          return (s as any).__weekRanges.some((r: { start: number; end: number }) =>
+            targetWeek >= r.start && targetWeek <= r.end
+          );
+        }
+        return s.weekStart <= targetWeek && targetWeek <= s.weekEnd;
+      });
+      cell.font = dayHasHighlight
+        ? { ...headerFont, color: { argb: 'FFFF0000' }, bold: true }
+        : headerFont;
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     });
 
@@ -208,7 +224,7 @@ async function buildHighlightWorkbookByRoom(targetWeek: number) {
 
           const font = isHighlight ? highlightFont : normalFont;
 
-          const textWithNewline = (index === 0 ? '' : '\n') + lineText;
+          const textWithNewline = (index === 0 ? '' : '\n\n') + lineText;
           richText.push({ text: textWithNewline, font });
         });
 
@@ -319,8 +335,26 @@ async function buildHighlightWorkbookByWeekday(targetWeek: number) {
       '节次/时间',
       ...sortedRooms.map((room) => room.roomName || room.roomNumber)
     ]);
-    headerRow.eachCell((cell) => {
-      cell.font = headerFont;
+    headerRow.eachCell((cell, colNumber) => {
+      if (colNumber === 1) {
+        cell.font = headerFont;
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+        return;
+      }
+      const roomIdx = colNumber - 2;
+      const roomData = mergedRooms.find((r: any) => r.id === sortedRooms[roomIdx]?.id);
+      const roomHasHighlight = targetWeek > 0 && roomData?.schedules?.some((s: any) => {
+        if (s.dayOfWeek !== weekdayIndex + 1) return false;
+        if ((s as any).__weekRanges) {
+          return (s as any).__weekRanges.some((r: { start: number; end: number }) =>
+            targetWeek >= r.start && targetWeek <= r.end
+          );
+        }
+        return s.weekStart <= targetWeek && targetWeek <= s.weekEnd;
+      });
+      cell.font = roomHasHighlight
+        ? { ...headerFont, color: { argb: 'FFFF0000' }, bold: true }
+        : headerFont;
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     });
 
@@ -402,7 +436,7 @@ async function buildHighlightWorkbookByWeekday(targetWeek: number) {
           }
 
           const font = isHighlight ? highlightFont : normalFont;
-          const textWithNewline = (index === 0 ? '' : '\n') + lineText;
+          const textWithNewline = (index === 0 ? '' : '\n\n') + lineText;
 
           richText.push({ text: textWithNewline, font });
         });
@@ -769,15 +803,13 @@ router.get('/excel', authenticate, requireAdmin, async (req, res, next) => {
  */
 router.get('/original', authenticate, requireAdmin, async (req, res, next) => {
   try {
-    const latestVersion = await prisma.scheduleVersion.findFirst({
-      orderBy: { version: 'desc' }
-    });
+    const activeVersion = await prisma.scheduleVersion.findFirst({ where: { isActive: true } });
 
-    if (!latestVersion) {
-      return res.status(404).json({ error: '未找到任何导入记录' });
+    if (!activeVersion) {
+      return res.status(404).json({ error: '未找到启用的课表版本' });
     }
 
-    const filePath = latestVersion.originalFilePath;
+    const filePath = activeVersion.originalFilePath;
     if (!filePath) {
       return res.status(404).json({ error: '该版本未保存原始文件' });
     }
@@ -898,16 +930,17 @@ router.get('/excel-by-week', async (req, res, next) => {
 router.get('/highlight-by-week/room', async (req, res, next) => {
   try {
     const weekParam = req.query.week as string | undefined;
-    const week = weekParam ? parseInt(weekParam, 10) : NaN;
+    // week=0 或不传时表示不高亮（导出全量课表）
+    const week = weekParam ? parseInt(weekParam, 10) : 0;
 
-    if (!weekParam || Number.isNaN(week) || week < 1 || week > 30) {
-      return res.status(400).json({ error: '无效的周次参数，必须是 1-30 的整数' });
+    if (Number.isNaN(week) || week < 0 || week > 30) {
+      return res.status(400).json({ error: '无效的周次参数，必须是 0-30 的整数（0 表示不高亮）' });
     }
 
     const workbook = await buildHighlightWorkbookByRoom(week);
     const buffer = await workbook.xlsx.writeBuffer();
 
-    const filename = `课表-第${week}周-按机房.xlsx`;
+    const filename = week > 0 ? `课表-第${week}周-按机房.xlsx` : `课表-按机房.xlsx`;
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -949,16 +982,17 @@ router.get('/highlight-by-week/room', async (req, res, next) => {
 router.get('/highlight-by-week/weekday', async (req, res, next) => {
   try {
     const weekParam = req.query.week as string | undefined;
-    const week = weekParam ? parseInt(weekParam, 10) : NaN;
+    // week=0 或不传时表示不高亮（导出全量课表）
+    const week = weekParam ? parseInt(weekParam, 10) : 0;
 
-    if (!weekParam || Number.isNaN(week) || week < 1 || week > 30) {
-      return res.status(400).json({ error: '无效的周次参数，必须是 1-30 的整数' });
+    if (Number.isNaN(week) || week < 0 || week > 30) {
+      return res.status(400).json({ error: '无效的周次参数，必须是 0-30 的整数（0 表示不高亮）' });
     }
 
     const workbook = await buildHighlightWorkbookByWeekday(week);
     const buffer = await workbook.xlsx.writeBuffer();
 
-    const filename = `课表-第${week}周-按星期.xlsx`;
+    const filename = week > 0 ? `课表-第${week}周-按星期.xlsx` : `课表-按星期.xlsx`;
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -1091,6 +1125,76 @@ router.get('/daily-schedule', async (req, res, next) => {
   } catch (error: any) {
     console.error('生成单日课表时出错:', error);
     console.error('错误堆栈:', error.stack);
+    next(error);
+  }
+});
+
+/**
+ * GET /api/export/timetable-info
+ * 返回当前最新版本和最新学期信息，用于页面顶部展示
+ */
+router.get('/timetable-info', async (req, res, next) => {
+  try {
+    // 优先取启用的版本，没有时回退到版本号最大的版本
+    const activeVersion = await prisma.scheduleVersion.findFirst({
+      where: { isActive: true }
+    });
+    const latestSemester = await prisma.semester.findFirst({
+      orderBy: [{ sortOrder: 'asc' }, { startDate: 'desc' }]
+    });
+    res.json({
+      success: true,
+      data: {
+        version: activeVersion ? activeVersion.version : null,
+        versionId: activeVersion ? activeVersion.id : null,
+        semester: latestSemester ? latestSemester.semester : null,
+        semesterStartDate: latestSemester ? latestSemester.startDate : null,
+        semesterEndDate: latestSemester ? latestSemester.endDate : null
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/export/timetable-json
+ * 返回合并后的完整课表 JSON 数据，供前端渲染表格
+ * 返回格式：{ rooms: [{ id, roomNumber, roomName, capacity, schedules: [...] }] }
+ * 每条 schedule 包含 __combinedWeekText、__weekRanges 字段
+ */
+router.get('/timetable-json', async (req, res, next) => {
+  try {
+    const versionFilter = await getLatestVersionFilter();
+
+    const rooms = await prisma.computerRoom.findMany({
+      include: {
+        schedules: {
+          where: {
+            status: 'active',
+            ...versionFilter
+          },
+          orderBy: [
+            { weekStart: 'asc' },
+            { dayOfWeek: 'asc' },
+            { periodStart: 'asc' }
+          ]
+        }
+      },
+      orderBy: { roomNumber: 'asc' }
+    });
+
+    const mergedRooms = mergeSchedulesByWeek(rooms);
+
+    // 按机房名称排序
+    const sortedRooms = [...mergedRooms].sort((a: any, b: any) => {
+      const nameA = (a.roomName || a.roomNumber || '').toString();
+      const nameB = (b.roomName || b.roomNumber || '').toString();
+      return sortRoomName(nameA, nameB);
+    });
+
+    res.json({ success: true, data: { rooms: sortedRooms } });
+  } catch (error) {
     next(error);
   }
 });

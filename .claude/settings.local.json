@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(docker exec schedule_postgres:*)",
-      "Bash(docker compose restart:*)"
+      "Bash(docker compose restart:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(sed:*)"
     ]
   }
 }
