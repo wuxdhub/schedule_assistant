@@ -91,7 +91,9 @@ model Semester {
 // 课表版本表
 model ScheduleVersion {
   id          String   @id @default(uuid())
-  version     Int      @default(1) // 版本号（自动递增）
+  version     Int      // 版本号（唯一，手动指定）
+  semester    String?  // 所属学期，如 "2025-2026学年第一学期"
+  isActive    Boolean  @default(false) // 是否启用
   fileName    String   // 导入的文件名
   originalFilePath String? // 保存导入时原始文件的服务器路径
   fileHash    String?  // 文件哈希值（用于检测重复导入）
@@ -99,9 +101,9 @@ model ScheduleVersion {
   recordCount Int      @default(0) // 导入的记录数
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   schedules   Schedule[] // 该版本下的所有课程记录
-  
+
   @@unique([version])
   @@map("schedule_versions")
 }

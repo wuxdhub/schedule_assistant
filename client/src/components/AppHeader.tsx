@@ -7,7 +7,8 @@ import {
   ExportOutlined,
   UserOutlined,
   LogoutOutlined,
-  BookOutlined
+  BookOutlined,
+  DatabaseOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -39,6 +40,11 @@ const AppSidebar = () => {
 
   // 管理员专用菜单项
   const adminMenuItems = [
+    {
+      key: '/schedule-version',
+      icon: <DatabaseOutlined />,
+      label: '版本管理'
+    },
     {
       key: '/weekly-export',
       icon: <ExportOutlined />,

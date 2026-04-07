@@ -7,6 +7,7 @@ import scheduleRoutes from './routes/schedule';
 import exportRoutes from './routes/export';
 import authRoutes from './routes/auth';
 import semesterRoutes from './routes/semester';
+import scheduleVersionRoutes from './routes/scheduleVersion';
 import prisma from './lib/prisma';
 
 dotenv.config();
@@ -25,6 +26,7 @@ app.use(express.urlencoded({ extended: true }));
 // 路由
 app.use('/api/auth', authRoutes);
 app.use('/api/semester', semesterRoutes);
+app.use('/api/schedule-version', scheduleVersionRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/query', queryRoutes);
 app.use('/api/schedule', scheduleRoutes);

@@ -15,7 +15,9 @@ CREATE TABLE "computer_rooms" (
 -- CreateTable
 CREATE TABLE "schedule_versions" (
     "id" TEXT NOT NULL,
-    "version" INTEGER NOT NULL DEFAULT 1,
+    "version" INTEGER NOT NULL,
+    "semester" TEXT,
+    "isActive" BOOLEAN NOT NULL DEFAULT false,
     "fileName" TEXT NOT NULL,
     "originalFilePath" TEXT,
     "fileHash" TEXT,
@@ -58,6 +60,21 @@ CREATE TABLE "users" (
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "users_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "semesters" (
+    "id" TEXT NOT NULL,
+    "semester" TEXT NOT NULL,
+    "startDate" DATE NOT NULL,
+    "endDate" DATE NOT NULL,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdBy" TEXT,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "updatedBy" TEXT,
+
+    CONSTRAINT "semesters_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -103,3 +120,7 @@ INSERT INTO "computer_rooms" ("id", "roomNumber", "roomName", "capacity", "locat
 -- 管理员用户（密码：admin123）
 INSERT INTO "users" ("id", "username", "password", "role", "createdAt", "updatedAt") VALUES
     ('4ae3eb0a-c55e-42de-91b2-6c695a136b60', 'admin', '$2a$10$rcx.udaqX1i8ZvMj1EgpTO7SvbDpFTHKLaIXnW8ullTSVSxYzekAm', 'admin', '2025-12-28 09:21:54.253', '2025-12-28 09:21:54.253');
+
+-- 学期初始数据
+INSERT INTO "semesters" ("id", "semester", "startDate", "endDate", "sortOrder", "createdAt", "updatedAt") VALUES
+    ('a1b2c3d4-e5f6-7890-abcd-ef1234567890', '2025-2026学年第2学期', '2026-03-02', '2026-07-05', 0, NOW(), NOW());
