@@ -39,7 +39,3 @@ Thumbs.db
 *.db
 *.sqlite
 
-# Prisma
-server/prisma/migrations/
-
-
