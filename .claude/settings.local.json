@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker exec schedule_postgres:*)",
+      "Bash(docker compose restart:*)"
+    ]
+  }
+}
