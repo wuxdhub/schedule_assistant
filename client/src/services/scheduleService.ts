@@ -136,17 +136,16 @@ export const exportHighlightByWeekWeekday = async (week: number): Promise<Blob> 
   }) as Promise<Blob>;
 };
 
-// variants with optional sendToWechat
-export const exportHighlightByWeekRoomWithSend = async (week: number, sendToWechat?: boolean): Promise<Blob> => {
+export const exportHighlightByWeekRoomWithSend = async (week: number): Promise<Blob> => {
   return api.get('/export/highlight-by-week/room', {
-    params: sendToWechat ? { week, sendToWechat: true } : { week },
+    params: { week },
     responseType: 'blob'
   }) as Promise<Blob>;
 };
 
-export const exportHighlightByWeekWeekdayWithSend = async (week: number, sendToWechat?: boolean): Promise<Blob> => {
+export const exportHighlightByWeekWeekdayWithSend = async (week: number): Promise<Blob> => {
   return api.get('/export/highlight-by-week/weekday', {
-    params: sendToWechat ? { week, sendToWechat: true } : { week },
+    params: { week },
     responseType: 'blob'
   }) as Promise<Blob>;
 };
@@ -161,10 +160,9 @@ export const getTimetableJson = async () => {
   return api.get('/export/timetable-json');
 };
 
-// 导出导入时上传的原始文件（原始 Excel），后端需在上传时保存原文件并提供此接口
-export const exportOriginalFile = async (sendToWechat?: boolean): Promise<Blob> => {
+// 导出导入时上传的原始文件
+export const exportOriginalFile = async (): Promise<Blob> => {
   return api.get('/export/original', {
-    params: sendToWechat ? { sendToWechat: true } : {},
     responseType: 'blob'
   }) as Promise<Blob>;
 };

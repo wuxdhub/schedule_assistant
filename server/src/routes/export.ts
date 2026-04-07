@@ -5,7 +5,6 @@ import prisma from '../lib/prisma';
 import { authenticate, requireAdmin } from '../middleware/auth';
 import fs from 'fs';
 import path from 'path';
-import { uploadAndSendFile } from '../utils/wechat';
 import os from 'os';
 import {
   PERIOD_RANGES,
@@ -827,17 +826,6 @@ router.get('/original', authenticate, requireAdmin, async (req, res, next) => {
     stream.on('error', (err) => {
       next(err);
     });
-    // 如果请求中包含 sendToWechat=true，则在后台上传并发送到企业微信群
-    if (req.query.sendToWechat === 'true') {
-      (async () => {
-        try {
-          const resSend = await uploadAndSendFile(filePath);
-          console.log('[wechat] uploadAndSendFile result:', resSend);
-        } catch (e) {
-          console.error('[wechat] uploadAndSendFile error:', e);
-        }
-      })();
-    }
   } catch (error) {
     next(error);
   }
@@ -893,28 +881,6 @@ router.get('/excel-by-week', async (req, res, next) => {
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
 
     res.send(buffer);
-
-    // 如果请求中包含 sendToWechat=true，则在后台上传并发送到企业微信群
-    if (req.query.sendToWechat === 'true') {
-      try {
-        const tempDir = path.join('uploads', 'shared');
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-        const ts = formatTimestampForFilename();
-        const tempPath = path.join(tempDir, `机房课表_第${week}周_${ts}.xlsx`);
-        fs.writeFileSync(tempPath, Buffer.from(buffer));
-        // 异步上传发送，不阻塞响应
-        (async () => {
-          try {
-            const resSend = await uploadAndSendFile(tempPath, { week, sharedFilePath: path.resolve(tempPath) });
-            console.log('[wechat] uploadAndSendFile result:', resSend);
-          } catch (e) {
-            console.error('[wechat] uploadAndSendFile error:', e);
-          }
-        })();
-      } catch (e) {
-        console.error('后台上传到企业微信失败:', e);
-      }
-    }
   } catch (error: any) {
     console.error('按周次导出Excel时出错:', error);
     console.error('错误堆栈:', error.stack);
@@ -947,26 +913,6 @@ router.get('/highlight-by-week/room', async (req, res, next) => {
     );
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
     res.send(Buffer.from(buffer));
-
-    if (req.query.sendToWechat === 'true') {
-      try {
-        const tempDir = path.join('uploads', 'shared');
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-        const ts = formatTimestampForFilename();
-        const tempPath = path.join(tempDir, `课表-第${week}周-按机房-${ts}.xlsx`);
-        fs.writeFileSync(tempPath, Buffer.from(buffer));
-        (async () => {
-          try {
-            const resSend = await uploadAndSendFile(tempPath, { week, sharedFilePath: path.resolve(tempPath) });
-            console.log('[wechat] uploadAndSendFile result:', resSend);
-          } catch (e) {
-            console.error('[wechat] uploadAndSendFile error:', e);
-          }
-        })();
-      } catch (e) {
-        console.error('后台上传到企业微信失败:', e);
-      }
-    }
   } catch (error: any) {
     console.error('按机房高亮导出时出错:', error);
     console.error('错误堆栈:', error.stack);
@@ -999,26 +945,6 @@ router.get('/highlight-by-week/weekday', async (req, res, next) => {
     );
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
     res.send(Buffer.from(buffer));
-
-    if (req.query.sendToWechat === 'true') {
-      try {
-        const tempDir = path.join('uploads', 'shared');
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-        const ts = formatTimestampForFilename();
-        const tempPath = path.join(tempDir, `课表-第${week}周-按星期-${ts}.xlsx`);
-        fs.writeFileSync(tempPath, Buffer.from(buffer));
-        (async () => {
-          try {
-            const resSend = await uploadAndSendFile(tempPath, { week, sharedFilePath: path.resolve(tempPath) });
-            console.log('[wechat] uploadAndSendFile result:', resSend);
-          } catch (e) {
-            console.error('[wechat] uploadAndSendFile error:', e);
-          }
-        })();
-      } catch (e) {
-        console.error('后台上传到企业微信失败:', e);
-      }
-    }
   } catch (error: any) {
     console.error('按星期高亮导出时出错:', error);
     console.error('错误堆栈:', error.stack);
@@ -1028,14 +954,13 @@ router.get('/highlight-by-week/weekday', async (req, res, next) => {
 
 /**
  * GET /api/export/daily-schedule
- * 生成指定周次和星期几的单日课表图片并发送到企业微信
- * query: week=1-30, dayOfWeek=1-7, sendToWechat=true/false
+ * 生成指定周次和星期几的单日课表图片
+ * query: week=1-30, dayOfWeek=1-7
  */
 router.get('/daily-schedule', async (req, res, next) => {
   try {
     const weekParam = req.query.week as string | undefined;
     const dayOfWeekParam = req.query.dayOfWeek as string | undefined;
-    const sendToWechat = req.query.sendToWechat === 'true';
     
     const week = weekParam ? parseInt(weekParam, 10) : NaN;
     const dayOfWeek = dayOfWeekParam ? parseInt(dayOfWeekParam, 10) : NaN;
@@ -1096,32 +1021,6 @@ router.get('/daily-schedule', async (req, res, next) => {
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
     res.send(imageBuffer);
-
-    // 如果需要发送到企业微信
-    if (sendToWechat) {
-      try {
-        const tempDir = path.join('uploads', 'shared');
-        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
-        const ts = formatTimestampForFilename();
-        const tempPath = path.join(tempDir, `第${week}周${dayNames[dayOfWeek]}课表_${ts}.png`);
-        fs.writeFileSync(tempPath, imageBuffer);
-        
-        // 异步发送到企业微信
-        (async () => {
-          try {
-            const resSend = await uploadAndSendFile(tempPath, {
-              week,
-              sharedFilePath: path.resolve(tempPath)
-            });
-            console.log('[wechat] uploadAndSendFile result:', resSend);
-          } catch (e) {
-            console.error('[wechat] uploadAndSendFile error:', e);
-          }
-        })();
-      } catch (e) {
-        console.error('后台上传到企业微信失败:', e);
-      }
-    }
   } catch (error: any) {
     console.error('生成单日课表时出错:', error);
     console.error('错误堆栈:', error.stack);
