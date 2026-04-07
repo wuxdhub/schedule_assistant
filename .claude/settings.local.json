@@ -4,7 +4,11 @@
       "Bash(docker exec schedule_postgres:*)",
       "Bash(docker compose restart:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(xargs wc:*)",
+      "Bash(wc:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node_modules/.bin/tsc --noEmit)"
     ]
   }
 }

@@ -185,7 +185,7 @@ const SemesterPage = () => {
         dataSource={data}
         rowKey="id"
         loading={loading}
-        pagination={{ pageSize: 20, showTotal: (total) => `共 ${total} 条` }}
+        pagination={{ defaultPageSize: 20, showSizeChanger: true, pageSizeOptions: ['10', '20', '50', '100'], showTotal: (total) => `共 ${total} 条` }}
       />
 
       <Modal

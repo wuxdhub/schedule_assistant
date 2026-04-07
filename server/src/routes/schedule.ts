@@ -280,6 +280,93 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res, next) => {
 });
 
 /**
+ * POST /api/schedule/batch-create
+ * 批量创建预约（需要管理员权限）
+ * 逻辑：全量冲突检测，有任何冲突则全部不入库；无冲突则事务一次性写入。
+ * 入库时 versionId 设为当前启用版本的 id（若无启用版本则为 null）。
+ */
+router.post('/batch-create', authenticate, requireAdmin, async (req, res, next) => {
+  try {
+    const { items } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: '请提供课程数据' });
+    }
+
+    // 获取当前启用版本
+    const activeVersion = await prisma.scheduleVersion.findFirst({ where: { isActive: true } });
+    const versionId = activeVersion?.id ?? null;
+
+    // 第一步：对所有条目进行冲突检测，收集所有冲突
+    const conflicts: { index: number; item: any; conflictingSchedule: any }[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const { roomId, weekStart, weekEnd, dayOfWeek, periodStart, periodEnd } = item;
+
+      const conflictCheck = await checkScheduleConflict(
+        roomId,
+        parseInt(weekStart),
+        parseInt(weekEnd),
+        parseInt(dayOfWeek),
+        parseInt(periodStart),
+        parseInt(periodEnd)
+      );
+
+      if (conflictCheck.hasConflict) {
+        conflicts.push({ index: i, item, conflictingSchedule: conflictCheck.conflictingSchedule });
+      }
+    }
+
+    // 有冲突：全部不入库，返回冲突详情
+    if (conflicts.length > 0) {
+      return res.status(409).json({
+        success: false,
+        error: '存在时间冲突，全部课程未入库',
+        conflictCount: conflicts.length,
+        conflicts: conflicts.map(c => ({
+          index: c.index,
+          item: c.item,
+          conflictingSchedule: c.conflictingSchedule
+        }))
+      });
+    }
+
+    // 第二步：无冲突，事务一次性写入
+    const created = await prisma.$transaction(
+      items.map((item: any) =>
+        prisma.schedule.create({
+          data: {
+            computerRoomId: item.roomId,
+            courseName: item.courseName,
+            teacher: item.teacher,
+            classes: item.classes
+              ? (typeof item.classes === 'string' ? item.classes : item.classes.join(';'))
+              : '',
+            weekStart: parseInt(item.weekStart),
+            weekEnd: parseInt(item.weekEnd),
+            dayOfWeek: parseInt(item.dayOfWeek),
+            periodStart: parseInt(item.periodStart),
+            periodEnd: parseInt(item.periodEnd),
+            source: 'manual',
+            status: 'active',
+            versionId
+          }
+        })
+      )
+    );
+
+    res.json({
+      success: true,
+      successCount: created.length,
+      versionId
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * GET /api/schedule/timetable
  * 获取时间表视图（按机房、星期、节次组织）
  */

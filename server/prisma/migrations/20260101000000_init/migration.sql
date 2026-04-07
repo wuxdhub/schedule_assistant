@@ -149,7 +149,7 @@ VALUES (
     1,
     'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=1966fb35-1795-446d-a875-235d16791f76',
     true,
-    "第二日提醒",
+    '第二日提醒',
     NOW(),
     'system',
     NOW()

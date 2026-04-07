@@ -8,7 +8,8 @@ import {
   BookOutlined,
   DatabaseOutlined,
   BellOutlined,
-  TableOutlined
+  TableOutlined,
+  FormOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -35,6 +36,11 @@ const AppSidebar = () => {
 
   // 管理员专用菜单项
   const adminMenuItems = [
+    {
+      key: '/booking',
+      icon: <FormOutlined />,
+      label: '课程预约'
+    },
     {
       key: '/semester',
       icon: <BookOutlined />,

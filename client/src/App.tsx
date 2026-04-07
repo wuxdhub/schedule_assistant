@@ -7,6 +7,7 @@ import SemesterPage from './pages/SemesterPage';
 import ScheduleVersionPage from './pages/ScheduleVersionPage';
 import ReminderPage from './pages/ReminderPage';
 import CourseQueryPage from './pages/CourseQueryPage';
+import BookingPage from './pages/BookingPage';
 import LoginPage from './pages/LoginPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -89,6 +90,11 @@ function AppContent() {
       <Route path="/semester" element={
         <AppLayout>
           <ProtectedRoute requireAdmin><SemesterPage /></ProtectedRoute>
+        </AppLayout>
+      } />
+      <Route path="/booking" element={
+        <AppLayout>
+          <ProtectedRoute requireAdmin><BookingPage /></ProtectedRoute>
         </AppLayout>
       } />
       <Route path="/schedule" element={

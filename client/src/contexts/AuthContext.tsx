@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { message } from 'antd';
 import api from '../services/api';
+import { clearBookingCache } from '../utils/bookingCache';
 
 interface User {
   id: string;
@@ -112,6 +113,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('userType');
+    sessionStorage.removeItem('booking_form_cache');
+    clearBookingCache();
     delete api.defaults.headers.common['Authorization'];
     setUser(null);
     message.success('已退出登录');

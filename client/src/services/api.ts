@@ -36,7 +36,10 @@ api.interceptors.response.use(
       }
     }
     const message = error.response?.data?.error || error.message || '请求失败';
-    return Promise.reject(new Error(message));
+    // 把完整的 response data 附到错误对象上，供调用方使用
+    const err = new Error(message) as any;
+    err.responseData = error.response?.data;
+    return Promise.reject(err);
   }
 );
 
