@@ -817,7 +817,7 @@ router.get('/original', authenticate, requireAdmin, async (req, res, next) => {
       return res.status(404).json({ error: '原始文件已丢失：' + filePath });
     }
 
-    const filename = latestVersion.fileName || path.basename(filePath);
+    const filename = activeVersion.fileName || path.basename(filePath);
     res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
 
