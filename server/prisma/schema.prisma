@@ -108,3 +108,19 @@ model ScheduleVersion {
   @@map("schedule_versions")
 }
 
+// 定时提醒表
+model Reminder {
+  id           String   @id @db.Char(36)
+  reminderTime DateTime @db.Time(0) // 提醒时间（时分秒）
+  intervalDays Int      @default(0) // 提醒间隔天数，0=当天，1=加一天
+  webhookUrl   String?  @db.VarChar(500) // webhook URL地址
+  isEnabled    Boolean  @default(true) // 是否启用
+  description  String?  @db.VarChar(200) // 描述
+  createdAt    DateTime @default(now())
+  createdBy    String?  @db.VarChar(50) // 创建人
+  updatedAt    DateTime @updatedAt
+  updatedBy    String?  @db.VarChar(50) // 修改人
+
+  @@map("reminder")
+}
+

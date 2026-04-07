@@ -1,14 +1,14 @@
 import { Layout, Menu, Button, Dropdown } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-  UploadOutlined,
   SearchOutlined,
   CalendarOutlined,
   ExportOutlined,
   UserOutlined,
   LogoutOutlined,
   BookOutlined,
-  DatabaseOutlined
+  DatabaseOutlined,
+  BellOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -34,7 +34,7 @@ const AppSidebar = () => {
     {
       key: '/query',
       icon: <SearchOutlined />,
-      label: '智能查询'
+      label: '机房查询'
     }
   ];
 
@@ -51,9 +51,9 @@ const AppSidebar = () => {
       label: '周次筛选导出'
     },
     {
-      key: '/import',
-      icon: <UploadOutlined />,
-      label: '课表上传'
+      key: '/reminder',
+      icon: <BellOutlined />,
+      label: '定时提醒'
     }
   ];
 

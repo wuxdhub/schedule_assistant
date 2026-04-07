@@ -6,30 +6,14 @@ import { authenticate, requireAdmin } from '../middleware/auth';
 import fs from 'fs';
 import path from 'path';
 import { uploadAndSendFile } from '../utils/wechat';
-import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
 import os from 'os';
-
-// 注册中文字体，兼容 Windows 和 Linux
-(function registerChineseFont() {
-  const platform = os.platform();
-  const candidates =
-    platform === 'win32'
-      ? [
-          'C:\\Windows\\Fonts\\msyh.ttc',   // 微软雅黑
-          'C:\\Windows\\Fonts\\simsun.ttc',  // 宋体
-        ]
-      : [
-          '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
-          '/usr/share/fonts/noto/NotoSansCJK-Regular.ttc',
-        ];
-  for (const p of candidates) {
-    try {
-      GlobalFonts.registerFromPath(p, 'CJK');
-      break;
-    } catch {}
-  }
-})();
-import sharp from 'sharp';
+import {
+  PERIOD_RANGES,
+  PERIOD_LABELS,
+  sortRoomName,
+  mergeSchedulesByWeek,
+  generateDailyScheduleImage,
+} from '../utils/scheduleImage';
 
 // 格式化时间戳为 YYYYMMDD_HHMMSS，用于文件名
 function formatTimestampForFilename(date?: Date): string {
@@ -42,7 +26,6 @@ const router = express.Router();
 
 /**
  * 获取最新版本的过滤条件
- * 返回 Prisma where 条件，用于过滤出最新版本的导入课程和手动预约的课程
  */
 async function getLatestVersionFilter(): Promise<any> {
   const latestVersion = await prisma.scheduleVersion.findFirst({
@@ -50,41 +33,16 @@ async function getLatestVersionFilter(): Promise<any> {
   });
 
   if (latestVersion) {
-    // 只显示最新版本的导入课程，或者手动预约的课程（versionId为null）
     return {
       OR: [
         { versionId: latestVersion.id },
-        { versionId: null } // 手动预约的课程
+        { versionId: null }
       ]
     };
   } else {
-    // 如果没有版本记录，只显示手动预约的课程
     return { versionId: null };
   }
 }
-
-/**
- * 根据课程的起止节次，找到对应的行索引
- * 行定义：
- *  0: 1-2节
- *  1: 3-4节
- *  2: 5节
- *  3: 6-7节
- *  4: 8-9节
- *  5: 10节
- *  6: 11-12节
- */
-const PERIOD_RANGES: Array<{ start: number; end: number; rowIndex: number }> = [
-  { start: 1, end: 2, rowIndex: 0 },  // 1-2节
-  { start: 3, end: 4, rowIndex: 1 },  // 3-4节
-  { start: 5, end: 5, rowIndex: 2 },  // 5节
-  { start: 6, end: 7, rowIndex: 3 },  // 6-7节
-  { start: 8, end: 9, rowIndex: 4 },  // 8-9节
-  { start: 10, end: 10, rowIndex: 5 }, // 10节
-  { start: 11, end: 12, rowIndex: 6 }  // 11-12节
-];
-
-const PERIOD_LABELS = ['1-2节', '3-4节', '5节', '6-7节', '8-9节', '10节', '晚'];
 
 /**
  * duty_schedule 方案二：构建“按机房分 sheet”的高亮课表（ExcelJS）
@@ -490,10 +448,9 @@ async function buildHighlightWorkbookByWeekday(targetWeek: number) {
 }
 
 /**
- * 合并相同课程的不同周次记录
- * 将除id和weekStart,weekEnd不同，其他列相同的数据进行合并
+ * 合并相同课程的不同周次记录（用于 /excel 接口内联合并，其余接口使用 scheduleImage 导出的版本）
  */
-function mergeSchedulesByWeek(rooms: any[]): any[] {
+function mergeForExcel(rooms: any[]): any[] {
   return rooms.map((room) => {
     if (!room.schedules || room.schedules.length === 0) {
       return room;
@@ -550,40 +507,6 @@ function mergeSchedulesByWeek(rooms: any[]): any[] {
   });
 }
 
-/**
- * 根据机房名称排序，用于sheet排序
- * 排序规则：第一微机室、第二微机室...、第十二微机室、东区图书馆机房
- */
-function sortRoomName(a: string, b: string): number {
-  // 提取数字前缀
-  const getNum = (name: string): number => {
-    const match = name.match(/第([一二三四五六七八九十\d]+)/);
-    if (!match) {
-      // 东区图书馆机房等排在最后
-      return 999;
-    }
-    const numStr = match[1];
-    // 处理中文数字
-    const numMap: Record<string, number> = {
-      '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
-      '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
-      '十一': 11, '十二': 12
-    };
-    if (numMap[numStr]) {
-      return numMap[numStr];
-    }
-    const num = parseInt(numStr);
-    return isNaN(num) ? 999 : num;
-  };
-  
-  return getNum(a) - getNum(b);
-}
-
-/**
- * 根据 duty_schedule 的方案一思想，生成基础"按机房分 sheet"的课表矩阵，
- * 可选地按指定周次进行过滤。
- * 使用 ExcelJS 实现，支持精细样式控制。
- */
 async function buildRoomWorkbook(
   rooms: any[],
   options?: {
@@ -819,55 +742,7 @@ router.get('/excel', authenticate, requireAdmin, async (req, res, next) => {
     });
 
     // 在导出前，对同一课程在不同周次的记录进行合并，仅影响导出展示，不改动数据库
-    const mergedRooms = rooms.map((room) => {
-      const groups = new Map<
-        string,
-        { base: any; weekRanges: Array<{ start: number; end: number }> }
-      >();
-
-      for (const s of room.schedules) {
-        const key = [
-          s.courseName,
-          s.teacher,
-          s.classes,
-          s.dayOfWeek,
-          s.periodStart,
-          s.periodEnd,
-          s.computerRoomId
-        ].join('|');
-
-        const range = { start: s.weekStart, end: s.weekEnd };
-
-        if (!groups.has(key)) {
-          groups.set(key, { base: s, weekRanges: [range] });
-        } else {
-          groups.get(key)!.weekRanges.push(range);
-        }
-      }
-
-      const mergedSchedules = Array.from(groups.values()).map((g) => {
-        const ranges = g.weekRanges
-          .map((r) => ({ ...r }))
-          .sort((a, b) => a.start - b.start || a.end - b.end);
-
-        // 计算用于导出的周次文本，如 {1-4周,7-10周}
-        const weekTextParts = ranges.map((r) =>
-          r.start === r.end ? `${r.start}周` : `${r.start}-${r.end}周`
-        );
-        const combinedWeekText = `{${weekTextParts.join(',')}}`;
-
-        // 为了不影响逻辑，只在导出时额外挂一个属性供 buildRoomWorkbook 使用
-        return {
-          ...g.base,
-          __combinedWeekText: combinedWeekText
-        };
-      });
-
-      return {
-        ...room,
-        schedules: mergedSchedules
-      };
-    });
+    const mergedRooms = mergeForExcel(rooms);
 
     const workbook = await buildRoomWorkbook(mergedRooms);
 
@@ -1219,374 +1094,6 @@ router.get('/daily-schedule', async (req, res, next) => {
     next(error);
   }
 });
-
-/**
- * 构建单日课表工作簿（支持高亮显示有课的机房）
- */
-async function buildDailyScheduleWorkbook(rooms: any[], week: number, dayOfWeek: number): Promise<ExcelJS.Workbook> {
-  const workbook = new ExcelJS.Workbook();
-  
-  const titleFont = { name: '宋体', size: 18 };
-  const headerFont = { name: '宋体', size: 12 };
-  const periodFont = { name: '宋体', size: 12 };
-  const normalFont = { name: '宋体', size: 9, color: { argb: 'FF000000' } };
-  const highlightFont = { name: '宋体', size: 9, color: { argb: 'FFFF0000' } }; // 红色高亮
-
-  const thinBorder: ExcelJS.Borders = {
-    top: { style: 'thin' },
-    left: { style: 'thin' },
-    bottom: { style: 'thin' },
-    right: { style: 'thin' },
-    diagonal: { up: false, down: false, style: 'thin', color: { argb: 'FF000000' } }
-  };
-
-  const dayNames = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-  const ws = workbook.addWorksheet(`第${week}周${dayNames[dayOfWeek]}课表`);
-
-  // 对机房按名称排序
-  const sortedRooms = [...rooms].sort((a, b) => {
-    const nameA = (a.roomName || a.roomNumber || '').toString();
-    const nameB = (b.roomName || b.roomNumber || '').toString();
-    return sortRoomName(nameA, nameB);
-  });
-
-  // 设置列宽：A列为节次，其余为机房
-  ws.getColumn(1).width = 12;
-  for (let c = 2; c <= sortedRooms.length + 1; c++) {
-    ws.getColumn(c).width = 25;
-  }
-
-  // 标题行
-  const lastCol = sortedRooms.length + 1;
-  ws.mergeCells(1, 1, 1, lastCol);
-  const titleCell = ws.getCell(1, 1);
-  titleCell.value = `第${week}周${dayNames[dayOfWeek]}机房课表`;
-  titleCell.font = titleFont;
-  titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-
-  // 表头行：节次/时间 + 机房名称（高亮有课的机房）
-  const headerRow = ws.addRow([
-    '节次/时间',
-    ...sortedRooms.map((room) => room.roomName || room.roomNumber)
-  ]);
-  
-  // 高亮有课的机房表头
-  headerRow.eachCell((cell, colNumber) => {
-    if (colNumber === 1) {
-      // 第一列节次/时间
-      cell.font = headerFont;
-    } else {
-      // 机房列
-      const roomIndex = colNumber - 2;
-      const room = sortedRooms[roomIndex];
-      const hasSchedules = room && room.schedules && room.schedules.length > 0;
-      
-      if (hasSchedules) {
-        // 有课程的机房用红色高亮
-        cell.font = { ...headerFont, color: { argb: 'FFFF0000' } };
-      } else {
-        // 没有课程的机房用普通颜色
-        cell.font = headerFont;
-      }
-    }
-    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-  });
-
-  // 构建课程数据：roomIndex -> periodIndex -> schedules[]
-  const scheduleMatrix: Array<Map<number, any[]>> = sortedRooms.map(() => new Map());
-  
-  sortedRooms.forEach((room, roomIndex) => {
-    room.schedules.forEach((schedule: any) => {
-      // 找到课程对应的节次行
-      const targetRowIndexes: number[] = [];
-      for (const range of PERIOD_RANGES) {
-        const overlap = Math.min(schedule.periodEnd, range.end) - Math.max(schedule.periodStart, range.start) + 1;
-        if (overlap > 0) {
-          targetRowIndexes.push(range.rowIndex);
-        }
-      }
-
-      for (const rowIndex of targetRowIndexes) {
-        const scheduleList = scheduleMatrix[roomIndex].get(rowIndex) || [];
-        scheduleList.push(schedule);
-        scheduleMatrix[roomIndex].set(rowIndex, scheduleList);
-      }
-    });
-  });
-
-  // 生成节次行
-  PERIOD_LABELS.forEach((label, periodIndex) => {
-    const row = ws.addRow(new Array(sortedRooms.length + 1).fill(''));
-    const rowRef = ws.getRow(row.number);
-    
-    // 第一列：节次标签
-    const periodCell = rowRef.getCell(1);
-    periodCell.value = label;
-    periodCell.font = periodFont;
-    periodCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-
-    // 其他列：各机房的课程（使用richText支持高亮）
-    sortedRooms.forEach((_, roomIndex) => {
-      const cell = rowRef.getCell(roomIndex + 2);
-      const schedules = scheduleMatrix[roomIndex].get(periodIndex) || [];
-      
-      if (schedules.length > 0) {
-        // 有课程时使用richText格式，支持高亮
-        const richText: ExcelJS.CellRichTextValue['richText'] = [];
-        
-        schedules.forEach((schedule, index) => {
-          const periodText = schedule.periodStart === schedule.periodEnd
-            ? `第${schedule.periodStart}节`
-            : `第${schedule.periodStart}-${schedule.periodEnd}节`;
-          const weekText = schedule.weekStart === schedule.weekEnd
-            ? `{${schedule.weekStart}周}`
-            : `{${schedule.weekStart}-${schedule.weekEnd}周}`;
-          const courseText = `${schedule.courseName}◇${periodText}${weekText}◇${schedule.teacher}◇${schedule.classes}`;
-          
-          // 检查是否应该高亮：当前周次在课程的周次范围内
-          const isHighlight = schedule.weekStart <= week && week <= schedule.weekEnd;
-          const font = isHighlight ? highlightFont : normalFont;
-          
-          const textWithNewline = (index === 0 ? '' : '\n') + courseText;
-          richText.push({ text: textWithNewline, font });
-        });
-        
-        cell.value = { richText };
-        cell.alignment = { wrapText: true, vertical: 'top' };
-      } else {
-        // 没有课程时使用普通格式
-        cell.value = '';
-        cell.font = normalFont;
-        cell.alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
-      }
-    });
-  });
-
-  // 设置边框
-  ws.eachRow((row) => {
-    row.eachCell((cell) => {
-      cell.border = thinBorder;
-      // 确保没有设置字体的单元格使用默认字体
-      if (!cell.font) {
-        cell.font = normalFont;
-      }
-      if (!cell.alignment) {
-        cell.alignment = { wrapText: true, vertical: 'top' };
-      }
-    });
-  });
-
-  return workbook;
-}
-
-/**
- * 生成单日课表图片
- */
-async function generateDailyScheduleImage(rooms: any[], week: number, dayOfWeek: number): Promise<Buffer> {
-  const dayNames = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-  
-  // 对机房按名称排序
-  const sortedRooms = [...rooms].sort((a, b) => {
-    const nameA = (a.roomName || a.roomNumber || '').toString();
-    const nameB = (b.roomName || b.roomNumber || '').toString();
-    return sortRoomName(nameA, nameB);
-  });
-
-  // 构建课程数据矩阵（先于画布创建，用于计算动态行高）
-  const scheduleMatrix: Array<Map<number, any[]>> = sortedRooms.map(() => new Map());
-
-  sortedRooms.forEach((room, roomIndex) => {
-    room.schedules.forEach((schedule: any) => {
-      for (const range of PERIOD_RANGES) {
-        const overlap = Math.min(schedule.periodEnd, range.end) - Math.max(schedule.periodStart, range.start) + 1;
-        if (overlap > 0) {
-          const list = scheduleMatrix[roomIndex].get(range.rowIndex) || [];
-          list.push(schedule);
-          scheduleMatrix[roomIndex].set(range.rowIndex, list);
-        }
-      }
-    });
-  });
-
-  const cellWidth = 200;
-  const lineHeight = 18;
-  const cellPaddingV = 10;
-  const cellPaddingH = 5;
-  const minCellHeight = 50;
-  const maxTextWidth = cellWidth - cellPaddingH * 2;
-
-  // 将文字按可用宽度换行，每次只测单个字符宽度并累加，避免重复测量整串
-  function wrapText(ctx: any, text: string, maxWidth: number): string[] {
-    const lines: string[] = [];
-    let current = '';
-    let currentWidth = 0;
-    for (const char of text) {
-      const charWidth = ctx.measureText(char).width;
-      if (currentWidth + charWidth > maxWidth && current.length > 0) {
-        lines.push(current);
-        current = char;
-        currentWidth = charWidth;
-      } else {
-        current += char;
-        currentWidth += charWidth;
-      }
-    }
-    if (current) lines.push(current);
-    return lines;
-  }
-
-  // 为每门课生成换行后的行数组（预渲染，用于计算行高）
-  // 需要临时canvas来测量文字宽度
-  const tempCanvas = createCanvas(100, 100);
-  const tempCtx = tempCanvas.getContext('2d');
-  tempCtx.font = '12px CJK';
-
-  // 预计算所有课程的换行结果并缓存，避免绘制时重复测量
-  const linesCache = new Map<any, string[]>();
-
-  function getScheduleLines(schedule: any): string[] {
-    if (linesCache.has(schedule)) return linesCache.get(schedule)!;
-    const periodText = schedule.periodStart === schedule.periodEnd
-      ? `第${schedule.periodStart}节`
-      : `第${schedule.periodStart}-${schedule.periodEnd}节`;
-    const weekText = schedule.weekStart === schedule.weekEnd
-      ? `{${schedule.weekStart}周}`
-      : `{${schedule.weekStart}-${schedule.weekEnd}周}`;
-    const lineText = `${schedule.courseName}◇${periodText}${weekText}◇${schedule.teacher}◇${schedule.classes}`;
-    const result = wrapText(tempCtx, lineText, maxTextWidth);
-    linesCache.set(schedule, result);
-    return result;
-  }
-
-  // 计算每个节次行的实际高度
-  const rowHeights: number[] = PERIOD_LABELS.map((_, periodIndex) => {
-    let maxLines = 0;
-    scheduleMatrix.forEach(roomMap => {
-      const schedules = roomMap.get(periodIndex) || [];
-      // 每门课的行数 + 课程间空行
-      const lines = schedules.reduce((sum: number, s: any, i: number) => {
-        return sum + getScheduleLines(s).length + (i < schedules.length - 1 ? 1 : 0);
-      }, 0);
-      if (lines > maxLines) maxLines = lines;
-    });
-    if (maxLines === 0) return minCellHeight;
-    return Math.max(minCellHeight, cellPaddingV * 2 + maxLines * lineHeight);
-  });
-
-  // 计算画布尺寸
-  const headerHeight = 60;
-  const titleHeight = 50;
-  const padding = 20;
-
-  const canvasWidth = Math.max(1200, (sortedRooms.length + 1) * cellWidth + padding * 2);
-  const canvasHeight = titleHeight + headerHeight + rowHeights.reduce((a, b) => a + b, 0) + padding * 2;
-
-  // 创建画布
-  const canvas = createCanvas(canvasWidth, canvasHeight);
-  const ctx = canvas.getContext('2d');
-
-  // 设置背景色
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvasWidth, canvasHeight);
-
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  // 绘制标题
-  ctx.fillStyle = '#000000';
-  ctx.font = 'bold 24px CJK';
-  ctx.fillText(`第${week}周${dayNames[dayOfWeek]}机房课表`, canvasWidth / 2, padding + titleHeight / 2);
-
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1;
-
-  const startY = padding + titleHeight;
-
-  // 绘制表头
-  ctx.font = 'bold 16px CJK';
-
-  ctx.fillStyle = '#f0f0f0';
-  ctx.fillRect(padding, startY, cellWidth, headerHeight);
-  ctx.strokeRect(padding, startY, cellWidth, headerHeight);
-  ctx.fillStyle = '#000000';
-  ctx.fillText('节次/时间', padding + cellWidth / 2, startY + headerHeight / 2);
-
-  sortedRooms.forEach((room, index) => {
-    const x = padding + (index + 1) * cellWidth;
-    const hasThisWeek = room?.schedules?.some((s: any) => s.weekStart <= week && week <= s.weekEnd);
-
-    ctx.fillStyle = '#f0f0f0';
-    ctx.fillRect(x, startY, cellWidth, headerHeight);
-    ctx.strokeRect(x, startY, cellWidth, headerHeight);
-
-    ctx.fillStyle = hasThisWeek ? '#ff0000' : '#000000';
-    ctx.fillText(room.roomName || room.roomNumber, x + cellWidth / 2, startY + headerHeight / 2);
-  });
-
-  // 绘制节次行（动态行高）
-  let currentY = startY + headerHeight;
-
-  PERIOD_LABELS.forEach((label, periodIndex) => {
-    const rowHeight = rowHeights[periodIndex];
-    const y = currentY;
-
-    // 节次标签列
-    ctx.font = '14px CJK';
-    ctx.fillStyle = '#f8f8f8';
-    ctx.fillRect(padding, y, cellWidth, rowHeight);
-    ctx.strokeRect(padding, y, cellWidth, rowHeight);
-    ctx.fillStyle = '#000000';
-    ctx.fillText(label, padding + cellWidth / 2, y + rowHeight / 2);
-
-    // 机房课程列
-    sortedRooms.forEach((_, roomIndex) => {
-      const x = padding + (roomIndex + 1) * cellWidth;
-      const schedules = scheduleMatrix[roomIndex].get(periodIndex) || [];
-
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(x, y, cellWidth, rowHeight);
-      ctx.strokeRect(x, y, cellWidth, rowHeight);
-
-      if (schedules.length > 0) {
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.font = '12px CJK';
-
-        let textY = y + cellPaddingV;
-        schedules.forEach((schedule, idx) => {
-          const isHighlight = schedule.weekStart <= week && week <= schedule.weekEnd;
-          ctx.fillStyle = isHighlight ? '#ff0000' : '#000000';
-
-          const lines = getScheduleLines(schedule);
-          lines.forEach(line => {
-            ctx.fillText(line, x + cellPaddingH, textY);
-            textY += lineHeight;
-          });
-
-          // 课程间加空行（最后一门不加）
-          if (idx < schedules.length - 1) {
-            textY += lineHeight;
-          }
-        });
-
-        ctx.textBaseline = 'middle';
-        ctx.textAlign = 'center';
-      }
-    });
-
-    currentY += rowHeight;
-  });
-
-  // 转换为PNG缓冲区
-  const buffer = canvas.toBuffer('image/png');
-  
-  // 使用sharp进行图片优化
-  const optimizedBuffer = await sharp(buffer)
-    .png({ quality: 90, compressionLevel: 6 })
-    .toBuffer();
-    
-  return optimizedBuffer;
-}
 
 export default router;
 

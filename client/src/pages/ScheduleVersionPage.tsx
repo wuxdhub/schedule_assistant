@@ -13,12 +13,17 @@ import {
   message,
   Tag,
   Switch,
-  Tooltip
+  Tooltip,
+  Upload
 } from 'antd';
-import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { PlusOutlined, EditOutlined, DeleteOutlined, CheckCircleOutlined, InboxOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import type { UploadFile } from 'antd';
 import dayjs from 'dayjs';
 import api from '../services/api';
+import { checkFileImported } from '../services/scheduleService';
+
+const { Dragger } = Upload;
 
 interface ScheduleVersion {
   id: string;
@@ -41,6 +46,8 @@ const ScheduleVersionPage = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [fileList, setFileList] = useState<UploadFile[]>([]);
+  const [checking, setChecking] = useState(false);
   const [form] = Form.useForm();
 
   const fetchList = async () => {
@@ -73,8 +80,8 @@ const ScheduleVersionPage = () => {
 
   const openCreate = () => {
     setEditingId(null);
+    setFileList([]);
     form.resetFields();
-    // 自动推算下一个版本号
     const maxVersion = data.length > 0 ? Math.max(...data.map(d => d.version)) : 0;
     form.setFieldsValue({ version: maxVersion + 1, isActive: false });
     setModalOpen(true);
@@ -82,6 +89,7 @@ const ScheduleVersionPage = () => {
 
   const openEdit = (record: ScheduleVersion) => {
     setEditingId(record.id);
+    setFileList([]);
     form.setFieldsValue({
       version: record.version,
       semester: record.semester,
@@ -112,31 +120,98 @@ const ScheduleVersionPage = () => {
     }
   };
 
-  const handleSubmit = async (values: any) => {
+  // 编辑模式：直接调用版本接口
+  const handleEditSubmit = async (values: any) => {
     setSubmitting(true);
     try {
-      const payload = {
+      await api.put(`/schedule-version/${editingId}`, {
         version: values.version,
         semester: values.semester || null,
         isActive: values.isActive ?? false,
         fileName: values.fileName,
         description: values.description || null
-      };
-
-      if (editingId) {
-        await api.put(`/schedule-version/${editingId}`, payload);
-        message.success('修改成功');
-      } else {
-        await api.post('/schedule-version/create', payload);
-        message.success('新增成功');
-      }
-
+      });
+      message.success('修改成功');
       setModalOpen(false);
       fetchList();
     } catch (err: any) {
       message.error(err?.message || '保存失败');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // 新增模式：上传 Excel 并导入
+  const doImport = async (file: File, values: any) => {
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('version', String(values.version));
+      if (values.semester) formData.append('semester', values.semester);
+      formData.append('isActive', String(values.isActive ?? false));
+      if (values.description) formData.append('description', values.description);
+
+      const res = await api.post('/upload/excel', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      message.success(`导入成功！成功 ${res.imported} 条，失败 ${res.failed} 条`);
+      setModalOpen(false);
+      setFileList([]);
+      fetchList();
+    } catch (err: any) {
+      message.error(err?.message || '导入失败');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCreateSubmit = async (values: any) => {
+    const file = fileList[0]?.originFileObj;
+    if (!file) {
+      message.warning('请选择要上传的课表文件');
+      return;
+    }
+
+    setChecking(true);
+    try {
+      const checkResult = await checkFileImported(file);
+      setChecking(false);
+
+      if (checkResult.imported && checkResult.version) {
+        Modal.confirm({
+          title: '文件已导入过',
+          icon: <ExclamationCircleOutlined />,
+          content: (
+            <div>
+              <p>该文件已在之前导入过：</p>
+              <ul style={{ marginTop: 8, paddingLeft: 20 }}>
+                <li>版本号：v{checkResult.version.version}</li>
+                <li>文件名：{checkResult.version.fileName || '未知'}</li>
+                <li>导入时间：{dayjs(checkResult.version.createdAt).format('YYYY-MM-DD HH:mm:ss')}</li>
+                <li>记录数：{checkResult.version.recordCount} 条</li>
+              </ul>
+              <p style={{ marginTop: 12, color: '#ff4d4f' }}>是否继续导入？继续将创建新版本。</p>
+            </div>
+          ),
+          okText: '继续导入',
+          cancelText: '取消',
+          onOk: () => doImport(file, values)
+        });
+      } else {
+        await doImport(file, values);
+      }
+    } catch (err: any) {
+      setChecking(false);
+      message.error('检查文件失败：' + (err?.message || '未知错误'));
+    }
+  };
+
+  const handleSubmit = (values: any) => {
+    if (editingId) {
+      handleEditSubmit(values);
+    } else {
+      handleCreateSubmit(values);
     }
   };
 
@@ -216,7 +291,7 @@ const ScheduleVersionPage = () => {
             编辑
           </Button>
           <Popconfirm
-            title="删除版本后，关联的课程记录将失去版本信息，确定删除吗？"
+            title="删除版本将同时删除该版本下所有课程数据，确定删除吗？"
             onConfirm={() => handleDelete(record.id)}
             okText="确定"
             cancelText="取消"
@@ -252,11 +327,12 @@ const ScheduleVersionPage = () => {
         title={editingId ? '编辑版本' : '新增版本'}
         open={modalOpen}
         onOk={() => form.submit()}
-        onCancel={() => setModalOpen(false)}
-        confirmLoading={submitting}
-        okText="保存"
+        onCancel={() => { setModalOpen(false); setFileList([]); }}
+        confirmLoading={submitting || checking}
+        okText={editingId ? '保存' : (checking ? '检查文件中...' : '导入')}
         cancelText="取消"
         destroyOnClose
+        width={520}
       >
         <Form
           form={form}
@@ -280,13 +356,33 @@ const ScheduleVersionPage = () => {
             <InputNumber min={1} style={{ width: '100%' }} placeholder="如：1" />
           </Form.Item>
 
-          <Form.Item
-            name="fileName"
-            label="文件名"
-            rules={[{ required: true, message: '请输入文件名' }]}
-          >
-            <Input placeholder="如：2025-2026-1课表.xlsx" />
-          </Form.Item>
+          {/* 新增时显示文件上传，编辑时显示文件名输入框 */}
+          {editingId ? (
+            <Form.Item
+              name="fileName"
+              label="文件名"
+              rules={[{ required: true, message: '请输入文件名' }]}
+            >
+              <Input placeholder="如：2025-2026-1课表.xlsx" />
+            </Form.Item>
+          ) : (
+            <Form.Item label="初始课表上传" required>
+              <Dragger
+                accept=".xlsx,.xls"
+                fileList={fileList}
+                maxCount={1}
+                beforeUpload={() => false}
+                onChange={(info) => setFileList(info.fileList.slice(-1))}
+                onRemove={() => setFileList([])}
+              >
+                <p className="ant-upload-drag-icon">
+                  <InboxOutlined />
+                </p>
+                <p className="ant-upload-text">点击或拖拽课表文件到此区域</p>
+                <p className="ant-upload-hint">支持 .xlsx 和 .xls 格式</p>
+              </Dragger>
+            </Form.Item>
+          )}
 
           <Form.Item name="description" label="描述">
             <Input.TextArea rows={2} placeholder="版本备注说明（可选）" />

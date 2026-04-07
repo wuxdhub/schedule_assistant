@@ -123,7 +123,7 @@ router.post('/excel', upload.single('file'), async (req, res, next) => {
 
     // 解析Excel文件（使用已保存的原始文件）
     const data = await parseExcelFile(destPath);
-    
+
     // if (data.length === 0) {
     //   // 清理已保存的原始文件（如果存在）
     //   if (fs.existsSync(destPath)) {
@@ -131,9 +131,17 @@ router.post('/excel', upload.single('file'), async (req, res, next) => {
     //   }
     //   return res.status(400).json({ error: 'Excel文件中没有找到有效数据' });
     // }
-    
+
+    // 从请求体读取版本参数
+    const { version, semester, isActive, description } = req.body;
+
     // 导入数据库（传入原始文件路径和文件名用于版本管理）
-    const result = await importSchedulesToDatabase(data, destPath, fileName);
+    const result = await importSchedulesToDatabase(data, destPath, fileName, {
+      version: version ? Number(version) : undefined,
+      semester: semester || undefined,
+      isActive: isActive === 'true' || isActive === true,
+      description: description || undefined
+    });
     // 注意：此处不删除已保存的原始文件（保留以便后续导出）
     
     res.json({

@@ -124,3 +124,33 @@ INSERT INTO "users" ("id", "username", "password", "role", "createdAt", "updated
 -- 学期初始数据
 INSERT INTO "semesters" ("id", "semester", "startDate", "endDate", "sortOrder", "createdAt", "updatedAt") VALUES
     ('a1b2c3d4-e5f6-7890-abcd-ef1234567890', '2025-2026学年第2学期', '2026-03-02', '2026-07-05', 0, NOW(), NOW());
+
+-- CreateTable
+CREATE TABLE "reminder" (
+    "id" CHAR(36) NOT NULL,
+    "reminderTime" TIME NOT NULL,
+    "intervalDays" INTEGER NOT NULL DEFAULT 0,
+    "webhookUrl" VARCHAR(500),
+    "isEnabled" BOOLEAN NOT NULL DEFAULT true,
+    "description" VARCHAR(200),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdBy" VARCHAR(50),
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedBy" VARCHAR(50),
+
+    CONSTRAINT "reminder_pkey" PRIMARY KEY ("id")
+);
+
+-- 定时提醒表初始化数据
+INSERT INTO "reminder" ("id", "reminderTime", "intervalDays", "webhookUrl", "isEnabled", "description", "createdAt", "createdBy", "updatedAt")
+VALUES (
+    gen_random_uuid()::CHAR(36),
+    '18:00:00',
+    1,
+    'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=1966fb35-1795-446d-a875-235d16791f76',
+    true,
+    "第二日提醒",
+    NOW(),
+    'system',
+    NOW()
+);

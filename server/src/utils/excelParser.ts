@@ -1046,7 +1046,13 @@ async function getNextVersionNumber(): Promise<number> {
 export async function importSchedulesToDatabase(
   rawData: ExcelScheduleData[],
   filePath?: string,
-  fileName?: string
+  fileName?: string,
+  options?: {
+    version?: number;
+    semester?: string;
+    isActive?: boolean;
+    description?: string;
+  }
 ): Promise<{ success: number; failed: number; versionId?: string }> {
   let success = 0;
   let failed = 0;
@@ -1078,21 +1084,23 @@ export async function importSchedulesToDatabase(
   }
   
   try {
-    // 创建新版本记录
-    const nextVersion = await getNextVersionNumber();
+    // 使用外部传入的版本号，否则自动递增
+    const nextVersion = options?.version ?? await getNextVersionNumber();
     let fileHash: string | null = null;
-    
+
     if (filePath) {
       fileHash = calculateFileHash(filePath);
     }
-    
+
     const version = await prisma.scheduleVersion.create({
       data: {
         version: nextVersion,
+        semester: options?.semester || null,
+        isActive: options?.isActive ?? false,
         fileName: fileName || 'unknown.xlsx',
         originalFilePath: filePath || null,
         fileHash: fileHash,
-        description: `导入时间: ${new Date().toLocaleString('zh-CN')}`,
+        description: options?.description || null,
         recordCount: 0
       }
     });

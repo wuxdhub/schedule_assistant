@@ -119,22 +119,22 @@ router.get('/list', async (req, res, next) => {
       where.status = status as string;
     }
     
-    // 默认只显示最新版本的导入课程，手动预约的课程不受版本限制
+    // 默认只显示已启用版本的导入课程，手动预约的课程不受版本限制
     // 如果 allVersions=true，则显示所有版本的课程
     if (allVersions !== 'true') {
-      // 获取最新版本号
-      const latestVersion = await prisma.scheduleVersion.findFirst({
-        orderBy: { version: 'desc' }
+      // 获取当前启用的版本
+      const activeVersion = await prisma.scheduleVersion.findFirst({
+        where: { isActive: true }
       });
-      
-      if (latestVersion) {
-        // 只显示最新版本的导入课程，或者手动预约的课程（versionId为null）
+
+      if (activeVersion) {
+        // 只显示启用版本的导入课程，或者手动预约的课程（versionId为null）
         where.OR = [
-          { versionId: latestVersion.id },
-          { versionId: null } // 手动预约的课程
+          { versionId: activeVersion.id },
+          { versionId: null }
         ];
       } else {
-        // 如果没有版本记录，只显示手动预约的课程
+        // 没有启用版本，只显示手动预约的课程
         where.versionId = null;
       }
     }
@@ -290,16 +290,29 @@ router.get('/timetable', async (req, res, next) => {
     const where: any = {
       status: 'active'
     };
-    
+
     if (weekStart && weekEnd) {
       where.weekStart = { lte: parseInt(weekEnd as string) };
       where.weekEnd = { gte: parseInt(weekStart as string) };
     }
-    
+
     if (roomId) {
       where.computerRoomId = roomId as string;
     }
-    
+
+    // 只显示启用版本的导入课程，或手动预约的课程
+    const activeVersion = await prisma.scheduleVersion.findFirst({
+      where: { isActive: true }
+    });
+    if (activeVersion) {
+      where.OR = [
+        { versionId: activeVersion.id },
+        { versionId: null }
+      ];
+    } else {
+      where.versionId = null;
+    }
+
     // 获取所有课程
     const schedules = await prisma.schedule.findMany({
       where,

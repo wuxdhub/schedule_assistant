@@ -159,6 +159,9 @@ router.delete('/:id', authenticate, requireAdmin, async (req, res, next) => {
       return res.status(404).json({ error: '版本不存在' });
     }
 
+    // 先删除该版本关联的所有课程记录
+    await prisma.schedule.deleteMany({ where: { versionId: id } });
+
     await prisma.scheduleVersion.delete({ where: { id } });
 
     res.json({ success: true, message: '版本已删除' });

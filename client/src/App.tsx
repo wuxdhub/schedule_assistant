@@ -1,12 +1,12 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Layout, Spin } from 'antd';
 import AppSidebar, { AppTopBar } from './components/AppHeader';
-import DataImportPage from './pages/DataImportPage';
 import QueryPage from './pages/QueryPage';
 import SchedulePage from './pages/SchedulePage';
 import SemesterPage from './pages/SemesterPage';
 import ScheduleVersionPage from './pages/ScheduleVersionPage';
 import WeeklyExportPage from './pages/WeeklyExportPage';
+import ReminderPage from './pages/ReminderPage';
 import LoginPage from './pages/LoginPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -157,17 +157,6 @@ function AppContent() {
               </Layout>
             }
           />
-          <Route path="/import" element={
-            <Layout style={{ minHeight: '100vh' }}>
-              <AppSidebar />
-              <Layout style={{ marginLeft: 200 }}>
-                <AppTopBar />
-                <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
-                  <ProtectedRoute requireAdmin><DataImportPage /></ProtectedRoute>
-                </Content>
-              </Layout>
-            </Layout>
-          } />
           <Route path="/schedule-version" element={
             <Layout style={{ minHeight: '100vh' }}>
               <AppSidebar />
@@ -175,6 +164,17 @@ function AppContent() {
                 <AppTopBar />
                 <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
                   <ProtectedRoute requireAdmin><ScheduleVersionPage /></ProtectedRoute>
+                </Content>
+              </Layout>
+            </Layout>
+          } />
+          <Route path="/reminder" element={
+            <Layout style={{ minHeight: '100vh' }}>
+              <AppSidebar />
+              <Layout style={{ marginLeft: 200 }}>
+                <AppTopBar />
+                <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
+                  <ProtectedRoute requireAdmin><ReminderPage /></ProtectedRoute>
                 </Content>
               </Layout>
             </Layout>

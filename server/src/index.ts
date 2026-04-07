@@ -8,6 +8,8 @@ import exportRoutes from './routes/export';
 import authRoutes from './routes/auth';
 import semesterRoutes from './routes/semester';
 import scheduleVersionRoutes from './routes/scheduleVersion';
+import reminderRoutes from './routes/reminder';
+import { startReminderScheduler } from './services/reminderScheduler';
 import prisma from './lib/prisma';
 
 dotenv.config();
@@ -31,6 +33,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/query', queryRoutes);
 app.use('/api/schedule', scheduleRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/reminder', reminderRoutes);
 
 // 健康检查
 app.get('/api/health', (req, res) => {
@@ -49,6 +52,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // 启动服务器
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+  startReminderScheduler();
 });
 
 // 优雅关闭
