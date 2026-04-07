@@ -9,7 +9,7 @@ import {
   message,
   Space,
 } from 'antd';
-import { DownloadOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
+import { DownloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import {
   getTimetableInfo,
@@ -322,8 +322,6 @@ export default function CourseQueryPage() {
   const [highlightEnabled, setHighlightEnabled] = useState(false);
   const [activeRoomKey, setActiveRoomKey] = useState<string>('');
   const [activeWeekdayKey, setActiveWeekdayKey] = useState<string>(String(today.day() === 0 ? 7 : today.day()));
-  const [roomTabOffset, setRoomTabOffset] = useState(0);
-  const ROOM_TAB_WINDOW = 11; // 一次显示几个机房 tab
 
   const todayWeekday = today.day() === 0 ? 7 : today.day(); // 1=周一 ... 7=周日
   const currentWeek = useMemo(
@@ -398,7 +396,7 @@ export default function CourseQueryPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1400 }}>
+    <div style={{ width: '100%' }}>
       {/* 顶部信息栏：标题居左，信息居右 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
         <Title level={4} style={{ margin: 0 }}>
@@ -488,17 +486,9 @@ export default function CourseQueryPage() {
       {/* 课表区 */}
       {viewMode === 'room' ? (
         <div>
-          {/* 自定义 Tab 栏：左右尖括号 + 均分填满的机房标签 */}
+          {/* 机房 Tab 栏：均分填满 */}
           <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f0f0f0', marginBottom: 8 }}>
-            <Button
-              type="text"
-              icon={<LeftOutlined />}
-              disabled={roomTabOffset === 0}
-              onClick={() => setRoomTabOffset((o) => Math.max(0, o - 1))}
-              style={{ flexShrink: 0 }}
-            />
-            <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-              {roomTabs.slice(roomTabOffset, roomTabOffset + ROOM_TAB_WINDOW).map((tab) => {
+            {roomTabs.map((tab) => {
                 const isActive = tab.key === activeRoomKey;
                 return (
                   <div
@@ -523,16 +513,6 @@ export default function CourseQueryPage() {
                   </div>
                 );
               })}
-            </div>
-            <Button
-              type="text"
-              icon={<RightOutlined />}
-              disabled={roomTabOffset + ROOM_TAB_WINDOW >= roomTabs.length}
-              onClick={() =>
-                setRoomTabOffset((o) => Math.min(roomTabs.length - ROOM_TAB_WINDOW, o + 1))
-              }
-              style={{ flexShrink: 0 }}
-            />
           </div>
           {/* 内容区 */}
           {activeRoom && (

@@ -21,7 +21,7 @@ services:
       - ./init-db:/docker-entrypoint-initdb.d
       - ./postgres.conf:/etc/postgresql/postgresql.conf
     ports:
-      - "5433:5432"
+      - "5432:5432"
     networks:
       - schedule_network
     # 资源限制 - 数据库分配1GB内存
