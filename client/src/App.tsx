@@ -4,6 +4,7 @@ import AppSidebar, { AppTopBar } from './components/AppHeader';
 import DataImportPage from './pages/DataImportPage';
 import QueryPage from './pages/QueryPage';
 import SchedulePage from './pages/SchedulePage';
+import SemesterPage from './pages/SemesterPage';
 import WeeklyExportPage from './pages/WeeklyExportPage';
 import LoginPage from './pages/LoginPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -54,6 +55,20 @@ function AppContent() {
         <>
           <Route path="/" element={<Navigate to="/schedule" replace />} />
           <Route
+            path="/semester"
+            element={
+              <Layout style={{ minHeight: '100vh' }}>
+                <AppSidebar />
+                <Layout style={{ marginLeft: 200 }}>
+                  <AppTopBar />
+                  <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
+                    <SemesterPage />
+                  </Content>
+                </Layout>
+              </Layout>
+            }
+          />
+          <Route
             path="/schedule"
             element={
               <Layout style={{ minHeight: '100vh' }}>
@@ -86,6 +101,20 @@ function AppContent() {
       ) : (
         <>
           <Route path="/" element={<Navigate to="/schedule" replace />} />
+          <Route
+            path="/semester"
+            element={
+              <Layout style={{ minHeight: '100vh' }}>
+                <AppSidebar />
+                <Layout style={{ marginLeft: 200 }}>
+                  <AppTopBar />
+                  <Content style={{ marginTop: 64, padding: '24px', background: '#f0f2f5' }}>
+                    <ProtectedRoute><SemesterPage /></ProtectedRoute>
+                  </Content>
+                </Layout>
+              </Layout>
+            }
+          />
           <Route
             path="/schedule"
             element={

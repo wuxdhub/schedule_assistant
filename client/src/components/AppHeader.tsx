@@ -6,7 +6,8 @@ import {
   CalendarOutlined,
   ExportOutlined,
   UserOutlined,
-  LogoutOutlined
+  LogoutOutlined,
+  BookOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -19,6 +20,11 @@ const AppSidebar = () => {
 
   // 基础菜单项（所有用户共有）
   const baseMenuItems = [
+    {
+      key: '/semester',
+      icon: <BookOutlined />,
+      label: '学期管理'
+    },
     {
       key: '/schedule',
       icon: <CalendarOutlined />,

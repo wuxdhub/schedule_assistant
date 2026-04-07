@@ -73,6 +73,21 @@ model User {
   @@map("users")
 }
 
+// 学期表
+model Semester {
+  id          String   @id @default(uuid())
+  semester    String   // 学期名称，如 "2025-2026学年第一学期"
+  startDate   DateTime @db.Date // 开始日期
+  endDate     DateTime @db.Date // 结束日期
+  sortOrder   Int      @default(0) // 排序
+  createdAt   DateTime @default(now())
+  createdBy   String?  // 创建人
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?  // 修改人
+
+  @@map("semesters")
+}
+
 // 课表版本表
 model ScheduleVersion {
   id          String   @id @default(uuid())
