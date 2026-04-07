@@ -4,12 +4,10 @@ import {
   Segmented,
   Switch,
   Button,
-  Tabs,
   Table,
   Spin,
   message,
   Space,
-  Tag
 } from 'antd';
 import { DownloadOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -309,6 +307,8 @@ function WeekdayTable({
 // 主页面
 // ─────────────────────────────────────────────
 export default function CourseQueryPage() {
+  const today = dayjs();
+
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [info, setInfo] = useState<{
@@ -321,11 +321,10 @@ export default function CourseQueryPage() {
   const [viewMode, setViewMode] = useState<'room' | 'weekday'>('room');
   const [highlightEnabled, setHighlightEnabled] = useState(false);
   const [activeRoomKey, setActiveRoomKey] = useState<string>('');
-  const [activeWeekdayKey, setActiveWeekdayKey] = useState<string>('1');
+  const [activeWeekdayKey, setActiveWeekdayKey] = useState<string>(String(today.day() === 0 ? 7 : today.day()));
   const [roomTabOffset, setRoomTabOffset] = useState(0);
   const ROOM_TAB_WINDOW = 11; // 一次显示几个机房 tab
 
-  const today = dayjs();
   const todayWeekday = today.day() === 0 ? 7 : today.day(); // 1=周一 ... 7=周日
   const currentWeek = useMemo(
     () => calcCurrentWeek(info.semesterStartDate),
@@ -545,24 +544,41 @@ export default function CourseQueryPage() {
           )}
         </div>
       ) : (
-        <Tabs
-          activeKey={activeWeekdayKey}
-          onChange={setActiveWeekdayKey}
-          items={weekdayTabs.map((tab) => ({
-            key: tab.key,
-            label: tab.label,
-            children:
-              activeWeekdayKey === tab.key ? (
-                <WeekdayTable
-                  dayOfWeek={parseInt(tab.key, 10)}
-                  rooms={rooms}
-                  currentWeek={currentWeek}
-                  highlightEnabled={highlightEnabled}
-                />
-              ) : null
-          }))}
-          tabBarStyle={{ marginBottom: 8 }}
-        />
+        <div>
+          {/* 按星期 Tab 栏：与按机房风格完全一致 */}
+          <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #f0f0f0', marginBottom: 8 }}>
+            {weekdayTabs.map((tab) => {
+              const isActive = tab.key === activeWeekdayKey;
+              return (
+                <div
+                  key={tab.key}
+                  onClick={() => setActiveWeekdayKey(tab.key)}
+                  style={{
+                    flex: 1,
+                    textAlign: 'center',
+                    padding: '8px 4px',
+                    cursor: 'pointer',
+                    fontSize: 14,
+                    color: isActive ? '#1677ff' : 'rgba(0,0,0,0.88)',
+                    borderBottom: isActive ? '2px solid #1677ff' : '2px solid transparent',
+                    fontWeight: isActive ? 600 : 400,
+                    whiteSpace: 'nowrap',
+                    transition: 'color 0.2s'
+                  }}
+                >
+                  {tab.label}
+                </div>
+              );
+            })}
+          </div>
+          {/* 内容区 */}
+          <WeekdayTable
+            dayOfWeek={parseInt(activeWeekdayKey, 10)}
+            rooms={rooms}
+            currentWeek={currentWeek}
+            highlightEnabled={highlightEnabled}
+          />
+        </div>
       )}
     </div>
   );
