@@ -57,7 +57,7 @@ zhinengpaike/
 确保 `server/.env` 文件存在且配置正确：
 
 ```env
-DATABASE_URL="postgresql://用户名:密码@localhost:5432/zhinengpaike?schema=public"
+DATABASE_URL="postgresql://用户名:密码@localhost:5432/schedule_db?schema=public"
 CORS_ORIGIN=http://localhost:3000
 ```
 

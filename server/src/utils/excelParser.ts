@@ -177,8 +177,13 @@ function parseScheduleText(
 ): ExcelScheduleData[] {
   const results: ExcelScheduleData[] = [];
   
+  // 预处理：修复两条课程被错误合并（无换行符）的情况
+  // 例如：...第12周Python... → ...第12周\nPython...
+  // 当"第X周"后紧跟非分隔符字符时，插入换行
+  const processedText = text.replace(/(第\d+周)([^\n◇◊\s\}，,;；])/g, '$1\n$2');
+
   // 一个单元格可能包含多个课程（用换行分隔）
-  const courseTexts = text.split(/\n+/).map(t => t.trim()).filter(t => t);
+  const courseTexts = processedText.split(/\n+/).map(t => t.trim()).filter(t => t);
   
   for (const courseText of courseTexts) {
     // 使用◇或◊分隔符分割（支持全角和半角）
@@ -218,17 +223,17 @@ function parseScheduleText(
           periodStr = `第${periodMatch[1]}-${periodMatch[2]}节`;
         }
         
-        // 检查周次是否包含逗号（混合周次格式）
-        const hasCommaInWeek = weekPart.includes(',') || weekPart.includes('，');
+        // 检查周次是否包含逗号或顿号（混合周次格式）
+        const hasCommaInWeek = weekPart.includes(',') || weekPart.includes('，') || weekPart.includes('、');
         
         if (hasCommaInWeek) {
-          // 处理混合周次格式：如"第11,13-16周" -> 拆分成 11 和 13-16
-          // 匹配格式：第11,13-16周 或 11,13-16周
-          const mixedWeekMatch = weekPart.match(/第?\{?(\d+(?:[−-]\d+)?(?:[,，]\d+(?:[−-]\d+)?)+)周?\}?/);
-          
+          // 处理混合周次格式：如"第11,13-16周"、"第3、6、9周" -> 拆分成各个周次
+          // 匹配格式：第11,13-16周 或 11,13-16周 或 第3、6、9周
+          const mixedWeekMatch = weekPart.match(/第?\{?(\d+(?:[−-]\d+)?(?:[,，、]\d+(?:[−-]\d+)?)+)周?\}?/);
+
           if (mixedWeekMatch) {
             const mixedWeekStr = mixedWeekMatch[1];
-            const weekSegments = mixedWeekStr.split(/[,，]/).map(s => s.trim());
+            const weekSegments = mixedWeekStr.split(/[,，、]/).map(s => s.trim());
             
             for (const segment of weekSegments) {
               // 处理每个段：可能是单个数字（如"11"）或范围（如"13-16"）
@@ -307,11 +312,21 @@ function parseScheduleText(
           classes = parts.length > 3 ? parts.slice(3).join(';').trim() : '';
         } else {
           // 标准格式：节次和周次分开
-          // parts[1] = 节次，parts[2] = 周次，parts[3] = 教师，parts[4+] = 班级
+          // 有教师：parts[1]=节次, parts[2]=周次, parts[3]=教师, parts[4+]=班级
+          // 无教师：parts[1]=节次, parts[2]=周次, parts[3]=班级（期末考试等格式）
           periodStr = parts[1].trim();
           weekStr = parts[2].trim();
-          teacher = parts[3] ? parts[3].trim() : '';
-          classes = parts.length > 4 ? parts.slice(4).join(';').trim() : '';
+          const part3 = parts[3] ? parts[3].trim() : '';
+          // 判断 parts[3] 是教师还是班级：班级包含4位数字（如2401、2501），教师名一般为纯中文2-4字
+          const isClassList = part3 && /\d{4}/.test(part3);
+          if (isClassList) {
+            // 无教师字段：parts[3] 是班级
+            teacher = '';
+            classes = parts.slice(3).join(';').trim();
+          } else {
+            teacher = part3;
+            classes = parts.length > 4 ? parts.slice(4).join(';').trim() : '';
+          }
         }
       }
       
@@ -445,7 +460,7 @@ function parseScheduleText(
     const weekRanges: Array<{ start: number; end: number }> = [];
     
     // 处理多个周次范围（用逗号分隔），例如：{1-4周,7-10周} 或 6-11周,13-17周}
-    const weekParts = weekStr.split(/[,，]/).map(p => p.trim()).filter(p => p);
+    const weekParts = weekStr.split(/[,，、]/).map(p => p.trim()).filter(p => p);
     
     for (const weekPart of weekParts) {
       // 先尝试匹配 {10-14周} 或 {10−14周} 格式（支持全角减号）
@@ -470,13 +485,20 @@ function parseScheduleText(
             const week = parseInt(singleWeekMatch[1]);
             weekRanges.push({ start: week, end: week });
           } else {
-            // 最后尝试：只提取数字范围，不要求"周"字
+            // 尝试数字范围（不要求"周"字），如 "3-6"
             weekMatch = weekPart.match(/(\d+)[−-](\d+)/);
             if (weekMatch) {
               weekRanges.push({
                 start: parseInt(weekMatch[1]),
                 end: parseInt(weekMatch[2])
               });
+            } else {
+              // 最后兜底：只有单个数字，如 "第3"、"3"
+              const singleDigitMatch = weekPart.match(/(\d+)/);
+              if (singleDigitMatch) {
+                const week = parseInt(singleDigitMatch[1]);
+                weekRanges.push({ start: week, end: week });
+              }
             }
           }
         }
@@ -502,7 +524,7 @@ function parseScheduleText(
           weekContent = weekContent.replace(/[（(]双[）)]/g, '').trim();
         }
         // 分割多个周次范围
-        const fallbackWeekParts = weekContent.split(/[,，]/).map(p => p.trim()).filter(p => p);
+        const fallbackWeekParts = weekContent.split(/[,，、]/).map(p => p.trim()).filter(p => p);
         for (const weekPart of fallbackWeekParts) {
           // 匹配范围：6-11周 或 13-17周
           const rangeMatch = weekPart.match(/(\d+)[−-](\d+)周?/);

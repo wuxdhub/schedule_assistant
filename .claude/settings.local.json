@@ -8,7 +8,8 @@
       "Bash(xargs wc:*)",
       "Bash(wc:*)",
       "Bash(npx tsc:*)",
-      "Bash(node_modules/.bin/tsc --noEmit)"
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(node -e ':*)"
     ]
   }
 }
