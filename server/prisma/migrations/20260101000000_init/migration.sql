@@ -117,9 +117,9 @@ INSERT INTO "computer_rooms" ("id", "roomNumber", "roomName", "capacity", "locat
     ('7c1f75d7-ec40-4c9a-a671-fc113fb7e7d1', 'A308', '第十二微机室', 63,  '', '', '2026-03-08 02:13:01.003', '2026-03-08 02:13:01.003'),
     ('f20b66de-4be3-45d9-9044-70c96a65ee0e', '东区图书馆机房', NULL, 50,  '', '', '2026-03-08 02:13:01.003', '2026-03-08 02:13:01.003');
 
--- 管理员用户（密码：admin123）
+-- 管理员用户（密码：Jisuan@2026）
 INSERT INTO "users" ("id", "username", "password", "role", "createdAt", "updatedAt") VALUES
-    ('4ae3eb0a-c55e-42de-91b2-6c695a136b60', 'admin', '$2a$10$rcx.udaqX1i8ZvMj1EgpTO7SvbDpFTHKLaIXnW8ullTSVSxYzekAm', 'admin', '2025-12-28 09:21:54.253', '2025-12-28 09:21:54.253');
+    ('4ae3eb0a-c55e-42de-91b2-6c695a136b60', 'admin', '$2a$10$CLOZNrEWRE5fRykPuVg1d.t7jjAnfVAkSYkdACGZnogjj8jyMvoiu', 'admin', '2025-12-28 09:21:54.253', '2025-12-28 09:21:54.253');
 
 -- 学期初始数据
 INSERT INTO "semesters" ("id", "semester", "startDate", "endDate", "sortOrder", "createdAt", "updatedAt") VALUES

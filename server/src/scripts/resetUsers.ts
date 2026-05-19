@@ -10,7 +10,7 @@ async function resetUsers() {
     console.log(`已删除 ${deletedCount.count} 个用户`);
 
     // 创建默认管理员用户
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Jisuan@2026';
     const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
 
     const admin = await prisma.user.create({
