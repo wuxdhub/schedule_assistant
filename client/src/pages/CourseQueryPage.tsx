@@ -8,6 +8,7 @@ import {
   Spin,
   message,
   Space,
+  Select,
 } from 'antd';
 import { DownloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
@@ -77,6 +78,15 @@ function calcCurrentWeek(semesterStartDate: string | null): number | null {
   const diff = today.diff(start, 'day');
   if (diff < 0) return null;
   return Math.floor(diff / 7) + 1;
+}
+
+// 计算学期总周数
+function calcTotalWeeks(semesterStartDate: string | null, semesterEndDate: string | null): number {
+  if (!semesterStartDate || !semesterEndDate) return 0;
+  const start = dayjs(semesterStartDate).startOf('day');
+  const end = dayjs(semesterEndDate).startOf('day');
+  const diff = end.diff(start, 'day') + 1;
+  return Math.ceil(diff / 7);
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -322,12 +332,27 @@ export default function CourseQueryPage() {
   const [highlightEnabled, setHighlightEnabled] = useState(false);
   const [activeRoomKey, setActiveRoomKey] = useState<string>('');
   const [activeWeekdayKey, setActiveWeekdayKey] = useState<string>(String(today.day() === 0 ? 7 : today.day()));
+  const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
 
   const todayWeekday = today.day() === 0 ? 7 : today.day(); // 1=周一 ... 7=周日
   const currentWeek = useMemo(
     () => calcCurrentWeek(info.semesterStartDate),
     [info.semesterStartDate]
   );
+  const totalWeeks = useMemo(
+    () => calcTotalWeeks(info.semesterStartDate, info.semesterEndDate),
+    [info.semesterStartDate, info.semesterEndDate]
+  );
+
+  // 数据加载完成后，设置默认选中周次
+  useEffect(() => {
+    if (currentWeek !== null && selectedWeek === null) {
+      setSelectedWeek(currentWeek);
+    }
+  }, [currentWeek]);
+
+  // 实际用于高亮和导出的周次
+  const activeWeek = selectedWeek;
 
   useEffect(() => {
     Promise.all([getTimetableInfo(), getTimetableJson()])
@@ -350,9 +375,9 @@ export default function CourseQueryPage() {
     const suffix = viewMode === 'room' ? '机房' : '星期';
     const filename = `${semesterLabel}${versionLabel ? '-' + versionLabel : ''}-上机课表-${suffix}.xlsx`;
 
-    // 高亮时需要传当前周次，否则传 0 表示不高亮
-    const exportWeek = highlightEnabled ? (currentWeek ?? 0) : 0;
-    if (highlightEnabled && !currentWeek) {
+    // 高亮时需要传选中的周次，否则传 0 表示不高亮
+    const exportWeek = highlightEnabled ? (activeWeek ?? 0) : 0;
+    if (highlightEnabled && !activeWeek) {
       message.warning('无法计算当前周次，请检查学期配置');
       return;
     }
@@ -413,20 +438,18 @@ export default function CourseQueryPage() {
               {info.semester}{info.version ? ` · 第${info.version}版本机房上机课表` : ''}
             </Text>
           )}
-          {/* 周次：绿色徽标感 */}
-          {currentWeek !== null ? (
-            <span style={{
-              display: 'inline-block',
-              padding: '1px 10px',
-              borderRadius: 12,
-              background: '#f6ffed',
-              border: '1px solid #b7eb8f',
-              color: '#389e0d',
-              fontSize: 13,
-              fontWeight: 500
-            }}>
-              第 {currentWeek} 周
-            </span>
+          {/* 周次选择器 */}
+          {totalWeeks > 0 ? (
+            <Select
+              value={selectedWeek}
+              onChange={(v) => setSelectedWeek(v)}
+              style={{ width: 110 }}
+              size="small"
+              options={Array.from({ length: totalWeeks }, (_, i) => ({
+                value: i + 1,
+                label: `第 ${i + 1} 周${i + 1 === currentWeek ? '（本周）' : ''}`
+              }))}
+            />
           ) : (
             <span style={{
               display: 'inline-block',
@@ -518,7 +541,7 @@ export default function CourseQueryPage() {
           {activeRoom && (
             <RoomTable
               room={activeRoom}
-              currentWeek={currentWeek}
+              currentWeek={activeWeek}
               highlightEnabled={highlightEnabled}
             />
           )}
@@ -555,7 +578,7 @@ export default function CourseQueryPage() {
           <WeekdayTable
             dayOfWeek={parseInt(activeWeekdayKey, 10)}
             rooms={rooms}
-            currentWeek={currentWeek}
+            currentWeek={activeWeek}
             highlightEnabled={highlightEnabled}
           />
         </div>
