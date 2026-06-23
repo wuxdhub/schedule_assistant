@@ -12,8 +12,8 @@ router.get('/list', async (req, res, next) => {
   try {
     const versions = await prisma.scheduleVersion.findMany({
       orderBy: [
-        { semester: 'asc' },
-        { version: 'asc' }
+        { semester: 'desc' },
+        { version: 'desc' }
       ]
     });
     res.json({ success: true, data: versions });
