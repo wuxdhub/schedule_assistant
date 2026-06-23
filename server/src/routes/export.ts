@@ -1034,21 +1034,25 @@ router.get('/daily-schedule', async (req, res, next) => {
  */
 router.get('/timetable-info', async (req, res, next) => {
   try {
-    // 优先取启用的版本，没有时回退到版本号最大的版本
+    // 取激活的课表版本
     const activeVersion = await prisma.scheduleVersion.findFirst({
       where: { isActive: true }
     });
-    const latestSemester = await prisma.semester.findFirst({
-      orderBy: [{ sortOrder: 'asc' }, { startDate: 'desc' }]
-    });
+    // 根据激活版本的 semester 字段查找对应的学期记录
+    let matchedSemester: any = null;
+    if (activeVersion?.semester) {
+      matchedSemester = await prisma.semester.findFirst({
+        where: { semester: activeVersion.semester }
+      });
+    }
     res.json({
       success: true,
       data: {
         version: activeVersion ? activeVersion.version : null,
         versionId: activeVersion ? activeVersion.id : null,
-        semester: latestSemester ? latestSemester.semester : null,
-        semesterStartDate: latestSemester ? latestSemester.startDate : null,
-        semesterEndDate: latestSemester ? latestSemester.endDate : null
+        semester: matchedSemester ? matchedSemester.semester : null,
+        semesterStartDate: matchedSemester ? matchedSemester.startDate : null,
+        semesterEndDate: matchedSemester ? matchedSemester.endDate : null
       }
     });
   } catch (error) {
