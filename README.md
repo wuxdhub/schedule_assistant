@@ -98,6 +98,20 @@ npm run reset:users
 docker-compose down
 ```
 
+6. 其他：
+ 如果你确实需要重置数据库，可以：
+```bash  
+# 停止并删除容器及 volume
+docker-compose down -v
+
+# 然后重新启动（数据库会用 init-db 脚本重新初始化）
+docker-compose up -d --build
+
+-v 参数会删除命名 volume（包括 postgres_data），数据库会从零开始，走 ./init-db 目录里的初始化脚本重建。
+
+注意：这会永久删除所有数据库数据，确认不需要后再执行。
+```
+
 ### 方法二：本地开发部署
 
 #### 第一步：检查数据库配置
