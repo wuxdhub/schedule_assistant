@@ -418,13 +418,16 @@ export class WeChatFileSender {
     filePath: string,
     options?: {
       week?: number;
+      dayOfWeek?: number; // 星期几，1-7
+      busyRoomNames?: string[]; // 占用机房名称列表
+      freeRoomNames?: string[]; // 空闲机房名称列表
       customMessage?: string;
       fallbackToLink?: boolean;
       downloadUrl?: string;
       sharedFilePath?: string; // 共享文件路径
     }
   ): Promise<WeChatResponse> {
-    const { week, customMessage, fallbackToLink = true, downloadUrl, sharedFilePath } = options || {};
+    const { week, dayOfWeek, busyRoomNames, freeRoomNames, customMessage, fallbackToLink = true, downloadUrl, sharedFilePath } = options || {};
     
     // 获取文件信息
     const originalFilename = path.basename(filePath);
@@ -441,10 +444,12 @@ export class WeChatFileSender {
       
       if (imageResult.success) {
         // 图片发送成功，发送提示消息
-        let successContent = `📋 课程表图片已发送完成！\n`;
-        successContent += `📁 文件名：${cleanFilename}\n`;
-        if (week) successContent += `🗓 周次：第${week}周\n`;
-        successContent += `⏰ 生成时间：${fileCreationTime}`;
+        const dayNames = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+        const dayStr = dayOfWeek ? ` ${dayNames[dayOfWeek]}` : '';
+        const weekStr = week ? `第${week}周` : '';
+        let successContent = `📅 课表信息（${weekStr}${dayStr}）\n\n`;
+        successContent += `占用机房：${busyRoomNames && busyRoomNames.length > 0 ? busyRoomNames.join('、') : '无'}\n\n`;
+        successContent += `空闲机房：${freeRoomNames && freeRoomNames.length > 0 ? freeRoomNames.join('、') : '无'}`;
         
         if (customMessage) {
           successContent += `\n\n💬 备注：${customMessage}`;

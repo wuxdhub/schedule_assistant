@@ -176,4 +176,15 @@ VALUES (
     NOW(),
     'system',
     NOW()
+),
+(
+    gen_random_uuid()::CHAR(36),
+    '07:00:00',
+    0,
+    'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=1966fb35-1795-446d-a875-235d16791f76',
+    false,
+    '当日提醒',
+    NOW(),
+    'system',
+    NOW()
 );

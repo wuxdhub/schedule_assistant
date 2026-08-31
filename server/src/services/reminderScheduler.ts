@@ -95,7 +95,7 @@ export async function fireReminder(reminderId: string, webhookUrl: string, inter
     ]
   };
 
-  const allRooms = await prisma.computerRoom.findMany({ orderBy: { roomNumber: 'asc' } });
+  const allRooms = await prisma.computerRoom.findMany({ orderBy: { sortOrder: 'asc' } });
   const schedules = await prisma.schedule.findMany({
     where: { status: 'active', dayOfWeek, ...versionFilter },
     include: { computerRoom: true },
@@ -128,10 +128,25 @@ export async function fireReminder(reminderId: string, webhookUrl: string, inter
   const tempPath = path.join(tempDir, `第${week}周${dayNames[dayOfWeek]}课表_${ts}.png`);
   fs.writeFileSync(tempPath, imageBuffer);
 
-  // 9. 推送到 reminder.webhookUrl（每条 reminder 独立）
+  // 9. 计算占用/空闲机房名称
+  const busyRoomNames: string[] = [];
+  const freeRoomNames: string[] = [];
+  for (const room of allRooms) {
+    const scheduleList = roomScheduleMap.get(room.id) || [];
+    // 检查该机房在当前周次是否有课
+    const isBusy = scheduleList.some((s: any) => week >= s.weekStart && week <= s.weekEnd);
+    const name = room.roomName || room.roomNumber;
+    if (isBusy) {
+      busyRoomNames.push(name);
+    } else {
+      freeRoomNames.push(name);
+    }
+  }
+
+  // 10. 推送到 reminder.webhookUrl（每条 reminder 独立）
   const sender = new WeChatFileSender({ webhookUrl, maxRetries: 3, timeout: 30000 });
   await sender.waitReady(); // 等待 axios/form-data 初始化完成
-  const result = await sender.sendExcelFile(tempPath, { week });
+  const result = await sender.sendExcelFile(tempPath, { week, dayOfWeek, busyRoomNames, freeRoomNames });
   console.log(`[reminder] ${reminderId}: 推送结果 ->`, result.message);
 }
 
