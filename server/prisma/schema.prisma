@@ -15,6 +15,7 @@ model ComputerRoom {
   roomNumber  String   @unique // 机房号，如 "A101"
   roomName    String?  // 机房中文名称，如 "第四微机室"
   capacity    Int      // 座位容量
+  sortOrder   Int      @default(0) // 排序序号
   location    String?  // 位置信息
   description String?  // 描述
   createdAt   DateTime @default(now())

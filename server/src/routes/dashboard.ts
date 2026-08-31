@@ -124,7 +124,7 @@ router.get('/stats', async (req: Request, res: Response) => {
 
       // 所有机房
       prisma.computerRoom.findMany({
-        orderBy: { roomNumber: 'asc' },
+        orderBy: { sortOrder: 'asc' },
       }),
 
       // 本周所有课程（用于计算机房使用率）
