@@ -9,6 +9,7 @@ import ReminderPage from './pages/ReminderPage';
 import CourseQueryPage from './pages/CourseQueryPage';
 import BookingPage from './pages/BookingPage';
 import PeriodConfigPage from './pages/PeriodConfigPage';
+import DashboardPage from './pages/DashboardPage';
 import LoginPage from './pages/LoginPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
@@ -76,10 +77,13 @@ function AppContent() {
 
   return (
     <Routes>
-      <Route path="/login" element={<Navigate to="/course-query" replace />} />
+      <Route path="/login" element={<Navigate to="/dashboard" replace />} />
 
       {/* 所有用户可访问 */}
-      <Route path="/" element={<Navigate to="/course-query" replace />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/dashboard" element={
+        <AppLayout><DashboardPage /></AppLayout>
+      } />
       <Route path="/course-query" element={
         <AppLayout><CourseQueryPage /></AppLayout>
       } />
@@ -119,7 +123,7 @@ function AppContent() {
         </AppLayout>
       } />
 
-      <Route path="*" element={<Navigate to="/course-query" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 }

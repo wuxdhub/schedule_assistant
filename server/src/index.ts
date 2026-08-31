@@ -10,6 +10,7 @@ import semesterRoutes from './routes/semester';
 import scheduleVersionRoutes from './routes/scheduleVersion';
 import reminderRoutes from './routes/reminder';
 import periodConfigRoutes from './routes/periodConfig';
+import dashboardRoutes from './routes/dashboard';
 import { startReminderScheduler } from './services/reminderScheduler';
 import prisma from './lib/prisma';
 
@@ -36,6 +37,7 @@ app.use('/api/schedule', scheduleRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/reminder', reminderRoutes);
 app.use('/api/period-config', periodConfigRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // 健康检查
 app.get('/api/health', (req, res) => {

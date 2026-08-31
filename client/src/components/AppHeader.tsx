@@ -6,6 +6,7 @@ import {
   UserOutlined,
   LogoutOutlined,
   BookOutlined,
+  DashboardOutlined,
   DatabaseOutlined,
   BellOutlined,
   TableOutlined,
@@ -23,6 +24,11 @@ const AppSidebar = () => {
 
   // 基础菜单项（普通用户可见）
   const baseMenuItems = [
+    {
+      key: '/dashboard',
+      icon: <DashboardOutlined />,
+      label: '首页概览'
+    },
     {
       key: '/course-query',
       icon: <TableOutlined />,

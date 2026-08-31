@@ -23,7 +23,9 @@
       "Bash(npx vite:*)",
       "Read(//c/Users/26939/.docker/**)",
       "Read(//etc/docker/**)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(xargs grep:*)",
+      "Bash(npm install:*)"
     ]
   }
 }
