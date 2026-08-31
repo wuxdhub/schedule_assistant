@@ -2,7 +2,7 @@
 
 ## 项目简介
 
-高校教务处机房课表助手，支持Excel导入、智能查询、预约管理、冲突检测、课表导出（Excel/PDF/PNG）、版本管理、数据同步等功能。
+高校教务处机房课表助手，支持Excel导入、智能查询、预约管理、冲突检测、课表导出（Excel/PNG）、版本管理、定时提醒等功能。
 
 ## 技术栈
 
@@ -33,11 +33,11 @@ schedule_assistant/
 │   │   │   ├── export.ts      # 课表导出接口
 │   │   │   ├── query.ts       # 查询接口
 │   │   │   ├── upload.ts      # Excel导入接口
-│   │   │   ├── schedule.ts    # 课表管理接口
-│   │   │   ├── semester.ts    # 学期管理接口
-│   │   │   └── reminder.ts    # 定时提醒接口
-│   │   ├── controllers/ # 控制器
-│   │   ├── models/  # 数据模型
+│   │   │   ├── schedule.ts        # 课表管理接口
+│   │   │   ├── scheduleVersion.ts # 版本管理接口
+│   │   │   ├── semester.ts        # 学期管理接口
+│   │   │   ├── periodConfig.ts    # 节次配置接口
+│   │   │   └── reminder.ts        # 定��提醒接口
 │   │   ├── services/ # 业务逻辑
 │   │   └── utils/   # 工具函数
 │   └── prisma/      # 数据库模型和迁移
@@ -57,9 +57,12 @@ schedule_assistant/
 
 ### 前提条件
 
-确保已安装：
-- ✅ Node.js >= 18.0.0
-- ✅ PostgreSQL >= 12.0
+Docker 部署只需安装：
+- Docker & Docker Compose
+
+本地开发部署需安装：
+- Node.js >= 18.0.0
+- PostgreSQL >= 12.0
 
 ### 方法一：Docker 部署（推荐）
 
@@ -73,7 +76,7 @@ DB_PASSWORD=your_secure_password
 2. 启动所有服务：
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 3. 访问系统：
@@ -85,32 +88,30 @@ docker-compose up -d
 4. 初始化数据库（首次运行）：
 
 ```bash
-# 进入容器执行
-cd server
-npx prisma migrate dev
-npx prisma generate
-npm run reset:users
+# 在容器内执行迁移和用户初始化
+docker compose exec server npx prisma migrate deploy
+docker compose exec server npm run reset:users
 ```
 
 5. 停止服务：
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
-6. 其他：
- 如果你确实需要重置数据库，可以：
-```bash  
-# 停止并删除容器及 volume
-docker-compose down -v
+6. 重置数据库：
 
-# 然后重新启动（数据库会用 init-db 脚本重新初始化）
-docker-compose up -d --build
+如果需要重置数据库（如修改了迁移文件），可以：
 
--v 参数会删除命名 volume（包括 postgres_data），数据库会从零开始，走 ./init-db 目录里的初始化脚本重建。
+```bash
+# 停止并删除容器及数据卷
+docker compose down -v
 
-注意：这会永久删除所有数据库数据，确认不需要后再执行。
+# 然后重新构建并启动（数据库会重新执行迁移）
+docker compose up -d --build
 ```
+
+`-v` 参数会删除命名 volume（包括 postgres_data）���数据库会从零开始重新执行 Prisma 迁移。**此操作会永久删除所有数据库数据，确认不需要后再执行。**
 
 ### 方法二：本地开发部署
 
@@ -198,7 +199,7 @@ VITE v5.x.x  ready in xxx ms
 
 ---
 
-### 第五步：访问系统
+#### 第五步：访问系统
 
 打开浏览器访问：http://localhost:3000
 
@@ -234,7 +235,7 @@ VITE v5.x.x  ready in xxx ms
 - ✅ 学期管理
 - ✅ 课表版本管理
 - ✅ 定时提醒设置
-- ✅ 课表管理
+- ✅ 节次配置管理
 
 ---
 
@@ -246,7 +247,7 @@ VITE v5.x.x  ready in xxx ms
 
 应该看到：
 ```json
-{"status":"ok","timestamp":"2024-..."}
+{"status":"ok","timestamp":"2026-..."}
 ```
 
 #### 检查前端
@@ -328,7 +329,7 @@ npm run dev
 # 终端2：npm run dev:client
 
 # 3. Docker部署
-docker-compose up -d
+docker compose up -d
 
 # 4. 访问系统
 # 浏览器打开：http://localhost:3000
@@ -345,7 +346,7 @@ docker-compose up -d
 Docker部署使用：
 
 ```bash
-docker-compose down
+docker compose down
 ```
 
 ---
@@ -429,6 +430,7 @@ docker-compose down
 3. **文件权限**：Docker部署时注意文件读写权限
 4. **内存限制**：Docker部署已设置内存限制，如需调整请修改 `docker-compose.yml`
 5. **数据备份**：定期备份PostgreSQL数据卷
+6. **数据库迁移与 Docker 重建**：`docker compose up -d --build` 只会重建应用镜像，不会清除 PostgreSQL 数据卷。修改了已执行过的迁移文件后需要 `docker compose down -v` 删除数据卷再重建，详见上方 Docker 部署第 6 步。
 
 ---
 

@@ -7,8 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import {
-  PERIOD_RANGES,
-  PERIOD_LABELS,
+  getPeriodConfig,
   sortRoomName,
   mergeSchedulesByWeek,
   generateDailyScheduleImage,
@@ -22,6 +21,19 @@ function formatTimestampForFilename(date?: Date): string {
 }
 
 const router = express.Router();
+
+/**
+ * 根据激活版本的 semester 字段动态生成导出标题
+ */
+async function getExportTitle(): Promise<string> {
+  const activeVersion = await prisma.scheduleVersion.findFirst({
+    where: { isActive: true }
+  });
+  if (activeVersion?.semester) {
+    return `${activeVersion.semester}机房上机课表`;
+  }
+  return '机房上机课表';
+}
 
 /**
  * 获取最新版本的过滤条件
@@ -48,6 +60,8 @@ async function getLatestVersionFilter(): Promise<any> {
  * - 目标周次命中的课程行整行标红加粗
  */
 async function buildHighlightWorkbookByRoom(targetWeek: number) {
+  const { ranges: PERIOD_RANGES, labels: PERIOD_LABELS } = await getPeriodConfig();
+  const exportTitle = await getExportTitle();
   // 获取最新版本过滤条件
   const versionFilter = await getLatestVersionFilter();
 
@@ -102,7 +116,7 @@ async function buildHighlightWorkbookByRoom(targetWeek: number) {
     // 第一行：标题
     ws.mergeCells('A1:H1');
     const titleCell = ws.getCell('A1');
-    titleCell.value = '2025-2026学年第1学期机房上机课表';
+    titleCell.value = exportTitle;
     titleCell.font = titleFont;
     titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
@@ -273,6 +287,8 @@ async function buildHighlightWorkbookByRoom(targetWeek: number) {
  * - 列：A 为节次，其余为机房
  */
 async function buildHighlightWorkbookByWeekday(targetWeek: number) {
+  const { ranges: PERIOD_RANGES, labels: PERIOD_LABELS } = await getPeriodConfig();
+  const exportTitle = await getExportTitle();
   // 获取最新版本过滤条件
   const versionFilter = await getLatestVersionFilter();
 
@@ -325,7 +341,7 @@ async function buildHighlightWorkbookByWeekday(targetWeek: number) {
     const lastCol = sortedRooms.length + 1;
     ws.mergeCells(1, 1, 1, lastCol);
     const titleCell = ws.getCell(1, 1);
-    titleCell.value = '2025-2026学年第1学期机房上机课表';
+    titleCell.value = exportTitle;
     titleCell.font = titleFont;
     titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
@@ -546,6 +562,8 @@ async function buildRoomWorkbook(
     targetWeek?: number;
   }
 ): Promise<ExcelJS.Workbook> {
+  const { ranges: PERIOD_RANGES, labels: PERIOD_LABELS } = await getPeriodConfig();
+  const exportTitle = await getExportTitle();
   const workbook = new ExcelJS.Workbook();
 
   // 定义字体样式
@@ -671,7 +689,7 @@ async function buildRoomWorkbook(
     // 第一行：标题（合并A1-H1）
     ws.mergeCells('A1:H1');
     const titleCell = ws.getCell('A1');
-    titleCell.value = '2025-2026学年第1学期机房上机课表';
+    titleCell.value = exportTitle;
     titleCell.font = titleFont;
     titleCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 

@@ -9,7 +9,8 @@ import {
   DatabaseOutlined,
   BellOutlined,
   TableOutlined,
-  FormOutlined
+  FormOutlined,
+  ClockCircleOutlined
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -46,6 +47,11 @@ const AppSidebar = () => {
       icon: <BookOutlined />,
       label: '学期管理'
     },
+    // {
+    //   key: '/period-config',
+    //   icon: <ClockCircleOutlined />,
+    //   label: '节次配置'
+    // },
     {
       key: '/schedule-version',
       icon: <DatabaseOutlined />,

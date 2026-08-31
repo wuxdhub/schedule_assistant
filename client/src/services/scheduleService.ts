@@ -35,6 +35,34 @@ export interface QueryFilter {
   minCapacity?: number;
 }
 
+export interface PeriodConfig {
+  id: string;
+  label: string;
+  startPeriod: number;
+  endPeriod: number;
+  sortOrder: number;
+}
+
+// 获取节次配置列表
+export const getPeriodConfigList = async () => {
+  return api.get('/period-config/list');
+};
+
+// 创建节次配置
+export const createPeriodConfig = async (data: Omit<PeriodConfig, 'id'>) => {
+  return api.post('/period-config/create', data);
+};
+
+// 更新节次配置
+export const updatePeriodConfig = async (id: string, data: Partial<PeriodConfig>) => {
+  return api.put(`/period-config/${id}`, data);
+};
+
+// 删除节次配置
+export const deletePeriodConfig = async (id: string) => {
+  return api.delete(`/period-config/${id}`);
+};
+
 // 检查文件是否已导入
 export const checkFileImported = async (file: File) => {
   const formData = new FormData();

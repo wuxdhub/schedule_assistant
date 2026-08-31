@@ -11,7 +11,19 @@
       "Bash(node_modules/.bin/tsc --noEmit)",
       "Bash(node -e ':*)",
       "Bash(node -e \"const bcrypt = require\\('./node_modules/bcryptjs/dist/bcrypt.js'\\); bcrypt.hash\\('Jisuan@2026', 10\\).then\\(h => console.log\\(h\\)\\)\")",
-      "Bash(node -e \"const b = require\\('./server/node_modules/bcryptjs'\\); b.hash\\('Jisuan@2026', 10\\).then\\(h => console.log\\(h\\)\\)\")"
+      "Bash(node -e \"const b = require\\('./server/node_modules/bcryptjs'\\); b.hash\\('Jisuan@2026', 10\\).then\\(h => console.log\\(h\\)\\)\")",
+      "Bash(python3)",
+      "Bash(python3 -c \"import xlrd; print\\('xlrd available'\\)\")",
+      "Bash(python3 -c \"import openpyxl; print\\('openpyxl available'\\)\")",
+      "Bash(python3 -c \"import pandas; print\\('pandas available'\\)\")",
+      "Bash(ls -lah *.xls)",
+      "Bash(python3 -m pip list)",
+      "Bash(grep -E \"\\\\.ts$\")",
+      "Bash(npx prisma:*)",
+      "Bash(npx vite:*)",
+      "Read(//c/Users/26939/.docker/**)",
+      "Read(//etc/docker/**)",
+      "Bash(docker compose:*)"
     ]
   }
 }

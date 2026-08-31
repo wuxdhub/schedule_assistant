@@ -1,6 +1,7 @@
 import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
 import sharp from 'sharp';
 import os from 'os';
+import prisma from '../lib/prisma';
 
 // 注册中文字体，兼容 Windows 和 Linux
 (function registerChineseFont() {
@@ -23,17 +24,24 @@ import os from 'os';
   }
 })();
 
-export const PERIOD_RANGES: Array<{ start: number; end: number; rowIndex: number }> = [
-  { start: 1,  end: 2,  rowIndex: 0 },
-  { start: 3,  end: 4,  rowIndex: 1 },
-  { start: 5,  end: 5,  rowIndex: 2 },
-  { start: 6,  end: 7,  rowIndex: 3 },
-  { start: 8,  end: 9,  rowIndex: 4 },
-  { start: 10, end: 10, rowIndex: 5 },
-  { start: 11, end: 12, rowIndex: 6 },
-];
-
-export const PERIOD_LABELS = ['1-2节', '3-4节', '5节', '6-7节', '8-9节', '10节', '晚'];
+/**
+ * 从数据库获取节次配置
+ */
+export async function getPeriodConfig(): Promise<{
+  ranges: Array<{ start: number; end: number; rowIndex: number }>;
+  labels: string[];
+}> {
+  const configs = await prisma.periodConfig.findMany({
+    orderBy: { sortOrder: 'asc' }
+  });
+  const ranges = configs.map(c => ({
+    start: c.startPeriod,
+    end: c.endPeriod,
+    rowIndex: c.sortOrder,
+  }));
+  const labels = configs.map(c => c.label);
+  return { ranges, labels };
+}
 
 export function sortRoomName(a: string, b: string): number {
   const getNum = (name: string): number => {
@@ -94,6 +102,7 @@ export async function generateDailyScheduleImage(
   dayOfWeek: number
 ): Promise<Buffer> {
   const dayNames = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+  const { ranges: PERIOD_RANGES, labels: PERIOD_LABELS } = await getPeriodConfig();
 
   const sortedRooms = [...rooms].sort((a, b) => {
     const nameA = (a.roomName || a.roomNumber || '').toString();

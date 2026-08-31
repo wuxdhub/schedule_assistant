@@ -121,9 +121,9 @@ INSERT INTO "computer_rooms" ("id", "roomNumber", "roomName", "capacity", "locat
 INSERT INTO "users" ("id", "username", "password", "role", "createdAt", "updatedAt") VALUES
     ('4ae3eb0a-c55e-42de-91b2-6c695a136b60', 'admin', '$2a$10$CLOZNrEWRE5fRykPuVg1d.t7jjAnfVAkSYkdACGZnogjj8jyMvoiu', 'admin', '2025-12-28 09:21:54.253', '2025-12-28 09:21:54.253');
 
--- 学期初始数据
-INSERT INTO "semesters" ("id", "semester", "startDate", "endDate", "sortOrder", "createdAt", "updatedAt") VALUES
-    ('a1b2c3d4-e5f6-7890-abcd-ef1234567890', '2025-2026学年第2学期', '2026-03-02', '2026-07-05', 0, NOW(), NOW());
+-- -- 学期初始数据
+-- INSERT INTO "semesters" ("id", "semester", "startDate", "endDate", "sortOrder", "createdAt", "updatedAt") VALUES
+--     ('a1b2c3d4-e5f6-7890-abcd-ef1234567890', '2025-2026学年第2学期', '2026-03-02', '2026-07-05', 0, NOW(), NOW());
 
 -- CreateTable
 CREATE TABLE "reminder" (
@@ -140,6 +140,28 @@ CREATE TABLE "reminder" (
 
     CONSTRAINT "reminder_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateTable
+CREATE TABLE "period_configs" (
+    "id" TEXT NOT NULL,
+    "label" TEXT NOT NULL,
+    "startPeriod" INTEGER NOT NULL,
+    "endPeriod" INTEGER NOT NULL,
+    "sortOrder" INTEGER NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "period_configs_pkey" PRIMARY KEY ("id")
+);
+
+-- 节次配置初始数据
+INSERT INTO "period_configs" ("id", "label", "startPeriod", "endPeriod", "sortOrder", "createdAt", "updatedAt") VALUES
+    (gen_random_uuid(), '1-2节', 1,  2,  0, NOW(), NOW()),
+    (gen_random_uuid(), '3-4节', 3,  4,  1, NOW(), NOW()),
+    (gen_random_uuid(), '5节',   5,  5,  2, NOW(), NOW()),
+    (gen_random_uuid(), '6-7节', 6,  7,  3, NOW(), NOW()),
+    (gen_random_uuid(), '8-9节', 8,  9,  4, NOW(), NOW()),
+    (gen_random_uuid(), '晚',   10, 12,  5, NOW(), NOW());
 
 -- 定时提醒表初始化数据
 INSERT INTO "reminder" ("id", "reminderTime", "intervalDays", "webhookUrl", "isEnabled", "description", "createdAt", "createdBy", "updatedAt")

@@ -108,6 +108,19 @@ model ScheduleVersion {
   @@map("schedule_versions")
 }
 
+// 节次配置表
+model PeriodConfig {
+  id          String   @id @default(uuid())
+  label       String   // 显示标签，如 "1-2节"、"晚"
+  startPeriod Int      // 起始节次编号
+  endPeriod   Int      // 结束节次编号
+  sortOrder   Int      // 排序序号
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("period_configs")
+}
+
 // 定时提醒表
 model Reminder {
   id           String   @id @db.Char(36)

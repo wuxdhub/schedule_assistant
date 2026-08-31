@@ -610,9 +610,9 @@ function parseScheduleText(
         periodEnd: finalPeriodEnd
       };
       
-      // 特别记录11-13节的课程
-      if (finalPeriodStart >= 11 || finalPeriodEnd >= 11) {
-        console.log(`[成功解析] 11-13节课程: 机房=${roomNumber}, 星期=${dayOfWeek}, 节次=${finalPeriodStart}-${finalPeriodEnd}, 课程="${courseName}", 教师="${teacher || '(空)'}", 班级="${classes || '(空)'}", 周次=${weekRange.start}-${weekRange.end}`);
+      // 特别记录晚间课程（10-12节）
+      if (finalPeriodStart >= 10 || finalPeriodEnd >= 10) {
+        console.log(`[成功解析] 晚间课程: 机房=${roomNumber}, 星期=${dayOfWeek}, 节次=${finalPeriodStart}-${finalPeriodEnd}, 课程="${courseName}", 教师="${teacher || '(空)'}", 班级="${classes || '(空)'}", 周次=${weekRange.start}-${weekRange.end}`);
       }
       
       results.push(record);
@@ -646,7 +646,14 @@ function findColumnIndex(headers: any[], keywords: string[]): number {
 export async function parseExcelFile(filePath: string): Promise<ExcelScheduleData[]> {
   const workbook = XLSX.readFile(filePath);
   const results: ExcelScheduleData[] = [];
-  
+
+  // 从 period_configs 表获取标签到节次的映射（如 "晚" → {start:10, end:12}）
+  const periodConfigs = await prisma.periodConfig.findMany();
+  const periodLabelMap: Record<string, { start: number; end: number }> = {};
+  for (const config of periodConfigs) {
+    periodLabelMap[config.label] = { start: config.startPeriod, end: config.endPeriod };
+  }
+
   // 遍历所有工作表
   workbook.SheetNames.forEach((sheetName) => {
     const worksheet = workbook.Sheets[sheetName];
@@ -674,7 +681,7 @@ export async function parseExcelFile(filePath: string): Promise<ExcelScheduleDat
     
     if (isScheduleFormat) {
       // 解析课表格式（传入 sheet 名以便从中解析容量）
-      parseScheduleFormat(sheetName, data as any[][], results);
+      parseScheduleFormat(sheetName, data as any[][], results, periodLabelMap);
     } else {
       // 解析标准表格格式
       parseStandardFormat(data as any[][], results);
@@ -687,7 +694,7 @@ export async function parseExcelFile(filePath: string): Promise<ExcelScheduleDat
 /**
  * 解析课表格式（矩阵式）
  */
-function parseScheduleFormat(sheetName: string, data: any[][], results: ExcelScheduleData[]): void {
+function parseScheduleFormat(sheetName: string, data: any[][], results: ExcelScheduleData[], periodLabelMap: Record<string, { start: number; end: number }>): void {
   console.log(`[调试] 开始解析工作表，共 ${data.length} 行`);
   
   // 先输出前10行的所有内容，帮助调试
@@ -839,11 +846,11 @@ function parseScheduleFormat(sheetName: string, data: any[][], results: ExcelSch
     const periodCell = String(row[0] || '').trim();
     if (!periodCell || periodCell === '') continue;
     
-    // 特殊处理"晚"这一行，通常表示11-13节
+    // 特殊处理"晚"这一行，从 period_configs 表动态获取映射
     let period: { start: number; end: number } | null = null;
     if (periodCell === '晚' || periodCell.includes('晚')) {
-      period = { start: 11, end: 13 };
-      console.log(`[调试] 识别"晚"行，设置为11-13节`);
+      period = periodLabelMap['晚'] || { start: 10, end: 12 };
+      console.log(`[调试] 识别"晚"行，设置为${period.start}-${period.end}节`);
     } else {
       // 解析节次（如"1-2节"、"3-4节"、"5节"等）
       period = parsePeriodRange(periodCell);
@@ -874,8 +881,8 @@ function parseScheduleFormat(sheetName: string, data: any[][], results: ExcelSch
     
       // 调试日志：记录解析的节次（针对所有机房，但详细程度不同）
       const isDebugRoom = roomInfo.roomNumber === 'A308';
-      // 特别关注11-13节的课程
-      const isEveningPeriod = period.start >= 11 || period.end >= 11;
+      // 特别关注晚间课程（10-12节）
+      const isEveningPeriod = period.start >= 10 || period.end >= 10;
       
       if (isDebugRoom || isEveningPeriod) {
         console.log(`[调试] 解析行${rowIdx + 1}: 节次=${period.start}-${period.end}, 第一列内容="${periodCell}", 机房=${roomInfo.roomNumber}`);
@@ -1240,10 +1247,10 @@ export async function importSchedulesToDatabase(
       
       if (schedulesToCreate.length > 0) {
         try {
-          // 特别记录11-13节的课程
-          const eveningCourses = schedulesToCreate.filter(s => s.periodStart >= 11 || s.periodEnd >= 11);
+          // 特别记录晚间课程（10-12节）
+          const eveningCourses = schedulesToCreate.filter(s => s.periodStart >= 10 || s.periodEnd >= 10);
           if (eveningCourses.length > 0) {
-            console.log(`[数据库导入] 准备导入 ${eveningCourses.length} 条11-13节课程:`);
+            console.log(`[数据库导入] 准备导入 ${eveningCourses.length} 条晚间课程:`);
             eveningCourses.forEach(course => {
               console.log(`  - 机房=${course.computerRoomId}, 星期=${course.dayOfWeek}, 节次=${course.periodStart}-${course.periodEnd}, 课程="${course.courseName}", 教师="${course.teacher}", 周次=${course.weekStart}-${course.weekEnd}`);
             });

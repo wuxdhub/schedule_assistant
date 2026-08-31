@@ -213,12 +213,12 @@ const QueryPage = () => {
           <Row gutter={16}>
             <Col span={8}>
               <Form.Item label="起始节次" name="periodStart">
-                <InputNumber min={1} max={13} placeholder="如：3" style={{ width: '100%' }} />
+                <InputNumber min={1} max={12} placeholder="如：3" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>
               <Form.Item label="结束节次" name="periodEnd">
-                <InputNumber min={1} max={13} placeholder="如：5" style={{ width: '100%' }} />
+                <InputNumber min={1} max={12} placeholder="如：5" style={{ width: '100%' }} />
               </Form.Item>
             </Col>
             <Col span={8}>

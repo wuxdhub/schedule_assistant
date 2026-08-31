@@ -16,24 +16,11 @@ import {
   getTimetableInfo,
   getTimetableJson,
   exportHighlightByWeekRoomWithSend,
-  exportHighlightByWeekWeekdayWithSend
+  exportHighlightByWeekWeekdayWithSend,
+  getPeriodConfigList
 } from '../services/scheduleService';
 
 const { Title, Text } = Typography;
-
-// 节次标签
-const PERIOD_LABELS = ['1-2节', '3-4节', '5节', '6-7节', '8-9节', '10节', '晚'];
-
-// 节次范围（与后端 PERIOD_RANGES 一致）
-const PERIOD_RANGES = [
-  { start: 1, end: 2, rowIndex: 0 },
-  { start: 3, end: 4, rowIndex: 1 },
-  { start: 5, end: 5, rowIndex: 2 },
-  { start: 6, end: 7, rowIndex: 3 },
-  { start: 8, end: 9, rowIndex: 4 },
-  { start: 10, end: 10, rowIndex: 5 },
-  { start: 11, end: 12, rowIndex: 6 }
-];
 
 const WEEKDAY_LABELS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
@@ -49,9 +36,13 @@ function isInWeek(schedule: any, targetWeek: number): boolean {
 }
 
 // 根据节次找到对应的 rowIndex 列表
-function getRowIndexes(periodStart: number, periodEnd: number): number[] {
+function getRowIndexes(
+  periodStart: number,
+  periodEnd: number,
+  periodRanges: Array<{ start: number; end: number; rowIndex: number }>
+): number[] {
   const indexes: number[] = [];
-  for (const pr of PERIOD_RANGES) {
+  for (const pr of periodRanges) {
     const overlap = Math.min(periodEnd, pr.end) - Math.max(periodStart, pr.start) + 1;
     if (overlap > 0) indexes.push(pr.rowIndex);
   }
@@ -104,17 +95,21 @@ function downloadBlob(blob: Blob, filename: string) {
 function RoomTable({
   room,
   currentWeek,
-  highlightEnabled
+  highlightEnabled,
+  periodLabels,
+  periodRanges
 }: {
   room: any;
   currentWeek: number | null;
   highlightEnabled: boolean;
+  periodLabels: string[];
+  periodRanges: Array<{ start: number; end: number; rowIndex: number }>;
 }) {
   // 构建 dayOfWeek(1-7) -> rowIndex -> schedules[]
   const cellMap = useMemo(() => {
     const map: Map<number, Map<number, any[]>> = new Map();
     for (const s of room.schedules || []) {
-      const rowIndexes = getRowIndexes(s.periodStart, s.periodEnd);
+      const rowIndexes = getRowIndexes(s.periodStart, s.periodEnd, periodRanges);
       for (const ri of rowIndexes) {
         const dayMap = map.get(s.dayOfWeek) || new Map<number, any[]>();
         const list = dayMap.get(ri) || [];
@@ -124,7 +119,7 @@ function RoomTable({
       }
     }
     return map;
-  }, [room]);
+  }, [room, periodRanges]);
 
   const columns = [
     {
@@ -184,7 +179,7 @@ function RoomTable({
     })
   ];
 
-  const dataSource = PERIOD_LABELS.map((label, ri) => {
+  const dataSource = periodLabels.map((label, ri) => {
     const row: any = { key: ri, period: label };
     for (let day = 1; day <= 7; day++) {
       const schedules = cellMap.get(day)?.get(ri) || [];
@@ -213,12 +208,16 @@ function WeekdayTable({
   dayOfWeek,
   rooms,
   currentWeek,
-  highlightEnabled
+  highlightEnabled,
+  periodLabels,
+  periodRanges
 }: {
   dayOfWeek: number;
   rooms: any[];
   currentWeek: number | null;
   highlightEnabled: boolean;
+  periodLabels: string[];
+  periodRanges: Array<{ start: number; end: number; rowIndex: number }>;
 }) {
   // 构建 roomIdx -> rowIndex -> schedules[]
   const cellMap = useMemo(() => {
@@ -226,7 +225,7 @@ function WeekdayTable({
     rooms.forEach((room, roomIdx) => {
       for (const s of room.schedules || []) {
         if (s.dayOfWeek !== dayOfWeek) continue;
-        const rowIndexes = getRowIndexes(s.periodStart, s.periodEnd);
+        const rowIndexes = getRowIndexes(s.periodStart, s.periodEnd, periodRanges);
         for (const ri of rowIndexes) {
           const list = map[roomIdx].get(ri) || [];
           list.push(s);
@@ -235,7 +234,7 @@ function WeekdayTable({
       }
     });
     return map;
-  }, [rooms, dayOfWeek]);
+  }, [rooms, dayOfWeek, periodRanges]);
 
   const columns = [
     {
@@ -291,7 +290,7 @@ function WeekdayTable({
     })
   ];
 
-  const dataSource = PERIOD_LABELS.map((label, ri) => {
+  const dataSource = periodLabels.map((label, ri) => {
     const row: any = { key: ri, period: label };
     rooms.forEach((_, roomIdx) => {
       const schedules = cellMap[roomIdx]?.get(ri) || [];
@@ -328,11 +327,15 @@ export default function CourseQueryPage() {
     semesterEndDate: string | null;
   }>({ version: null, semester: null, semesterStartDate: null, semesterEndDate: null });
   const [rooms, setRooms] = useState<any[]>([]);
-  const [viewMode, setViewMode] = useState<'room' | 'weekday'>('room');
-  const [highlightEnabled, setHighlightEnabled] = useState(false);
+  // 默认选择按星期查询
+  const [viewMode, setViewMode] = useState<'room' | 'weekday'>('weekday');
+  // 当周课程筛选默认打开
+  const [highlightEnabled, setHighlightEnabled] = useState(true);
   const [activeRoomKey, setActiveRoomKey] = useState<string>('');
   const [activeWeekdayKey, setActiveWeekdayKey] = useState<string>(String(today.day() === 0 ? 7 : today.day()));
   const [selectedWeek, setSelectedWeek] = useState<number | null>(null);
+  const [periodLabels, setPeriodLabels] = useState<string[]>([]);
+  const [periodRanges, setPeriodRanges] = useState<Array<{ start: number; end: number; rowIndex: number }>>([]);
 
   const todayWeekday = today.day() === 0 ? 7 : today.day(); // 1=周一 ... 7=周日
   const currentWeek = useMemo(
@@ -355,14 +358,22 @@ export default function CourseQueryPage() {
   const activeWeek = selectedWeek;
 
   useEffect(() => {
-    Promise.all([getTimetableInfo(), getTimetableJson()])
-      .then(([infoRes, dataRes]: any) => {
+    Promise.all([getTimetableInfo(), getTimetableJson(), getPeriodConfigList()])
+      .then(([infoRes, dataRes, periodRes]: any) => {
         setInfo(infoRes.data);
         const roomList = dataRes.data.rooms || [];
         setRooms(roomList);
         if (roomList.length > 0) {
           setActiveRoomKey(String(roomList[0].id));
         }
+        // 加载节次配置
+        const configs = periodRes.data || [];
+        setPeriodLabels(configs.map((c: any) => c.label));
+        setPeriodRanges(configs.map((c: any) => ({
+          start: c.startPeriod,
+          end: c.endPeriod,
+          rowIndex: c.sortOrder,
+        })));
       })
       .catch(() => message.error('加载课表数据失败'))
       .finally(() => setLoading(false));
@@ -543,6 +554,8 @@ export default function CourseQueryPage() {
               room={activeRoom}
               currentWeek={activeWeek}
               highlightEnabled={highlightEnabled}
+              periodLabels={periodLabels}
+              periodRanges={periodRanges}
             />
           )}
         </div>
@@ -580,6 +593,8 @@ export default function CourseQueryPage() {
             rooms={rooms}
             currentWeek={activeWeek}
             highlightEnabled={highlightEnabled}
+            periodLabels={periodLabels}
+            periodRanges={periodRanges}
           />
         </div>
       )}

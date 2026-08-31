@@ -419,8 +419,14 @@ router.get('/timetable', async (req, res, next) => {
       orderBy: { roomNumber: 'asc' }
     });
     
-    // 定义时间段（1-12节）
-    const periods = Array.from({ length: 12 }, (_, i) => i + 1);
+    // 从 period_configs 表动态获取最大节次数
+    const maxPeriodResult = await prisma.periodConfig.aggregate({
+      _max: { endPeriod: true }
+    });
+    const maxPeriod = maxPeriodResult._max.endPeriod || 12;
+
+    // 定义时间段
+    const periods = Array.from({ length: maxPeriod }, (_, i) => i + 1);
     const days = [1, 2, 3, 4, 5, 6, 7]; // 周一到周日
     
     // 构建时间表数据结构
