@@ -26,7 +26,12 @@
       "Bash(docker compose:*)",
       "Bash(xargs grep:*)",
       "Bash(npm install:*)",
-      "Bash(grep -n \"weekMatch\\\\|rangeMatch\\\\|\\(\\\\\\\\\\\\d+\\).*\\(\\\\\\\\\\\\d+\\)\" /d/work/北化/项目/课表助手/schedule_assistant/server/src/utils/excelParser.ts)"
+      "Bash(grep -n \"weekMatch\\\\|rangeMatch\\\\|\\(\\\\\\\\\\\\d+\\).*\\(\\\\\\\\\\\\d+\\)\" /d/work/北化/项目/课表助手/schedule_assistant/server/src/utils/excelParser.ts)",
+      "mcp__ide__executeCode",
+      "Bash(pip install:*)",
+      "Bash(python -c \"import xlrd; print\\(xlrd.__version__\\)\")",
+      "Bash(python -c ':*)",
+      "Bash(python -u -X utf8 -c ':*)"
     ]
   }
 }

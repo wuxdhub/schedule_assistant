@@ -312,9 +312,10 @@ function parseScheduleText(
           // 继续后续解析流程（周次解析、创建记录等）
           // 注意：这种格式通常没有classes字段，所以classes保持为空
         }
-      } else if (parts[3] && /\d+[−-]\d+节/.test(parts[3]) && (parts[3].includes('{') || parts[3].includes('}'))) {
-        // 格式：课程名◇部门/学院◇教师◇节次{周次}
+      } else if (parts[3] && /\d+[−-]\d+节/.test(parts[3])) {
+        // 格式：课程名◇部门/学院◇教师◇节次{周次} 或 课程名◇部门/学院◇教师◇节次◇周次
         // 例如：C语言考试◇信息学院◇马静◇6-9节{第十周}
+        // 例如：新生赛个人选拔赛◇信息学院◇周晓琳◇6-9节◇第6周
         courseName = parts[0].trim();
         teacher = parts[2] ? parts[2].trim() : '';
         classes = parts.length > 4 ? parts.slice(4).join(';').trim() : '';
@@ -325,10 +326,18 @@ function parseScheduleText(
           periodStr = `第${periodMatch[1]}-${periodMatch[2]}节`;
         }
 
-        // 从parts[3]提取周次
-        const weekMatch = parts[3].match(/\{([^}]+)\}/);
-        if (weekMatch) {
-          weekStr = weekMatch[1].trim();
+        // 从parts[3]提取周次（花括号内）
+        const weekMatchBrace = parts[3].match(/\{([^}]+)\}/);
+        if (weekMatchBrace) {
+          weekStr = weekMatchBrace[1].trim();
+        } else if (parts[4]) {
+          // 周次在parts[4]中，如"第6周"
+          const weekMatchPart4 = parts[4].match(/第?(\d+(?:[−-]\d+)?)周/);
+          if (weekMatchPart4) {
+            weekStr = weekMatchPart4[1] + '周';
+            // parts[4]已作为周次使用，班级从parts[5]开始
+            classes = parts.length > 5 ? parts.slice(5).join(';').trim() : '';
+          }
         }
 
         console.log(`[部门格式] 匹配成功: 课程="${courseName}", 教师="${teacher}", 节次="${periodStr}", 周次="${weekStr}"`);
