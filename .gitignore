@@ -9,6 +9,7 @@ coverage/
 # Production
 build/
 dist/
+data/
 
 # Environment variables
 # .env

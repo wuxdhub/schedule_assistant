@@ -25,7 +25,8 @@
       "Read(//etc/docker/**)",
       "Bash(docker compose:*)",
       "Bash(xargs grep:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(grep -n \"weekMatch\\\\|rangeMatch\\\\|\\(\\\\\\\\\\\\d+\\).*\\(\\\\\\\\\\\\d+\\)\" /d/work/北化/项目/课表助手/schedule_assistant/server/src/utils/excelParser.ts)"
     ]
   }
 }

@@ -63,6 +63,31 @@ function parsePeriodRange(periodStr: string): { start: number; end: number } | n
 }
 
 /**
+ * 将中文数字转为阿拉伯数字（支持一~二十）
+ */
+function chineseToNumber(cn: string): number | null {
+  const map: Record<string, number> = {
+    '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+    '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+    '十一': 11, '十二': 12, '十三': 13, '十四': 14, '十五': 15,
+    '十六': 16, '十七': 17, '十八': 18, '十九': 19, '二十': 20,
+  };
+  return map[cn] ?? null;
+}
+
+/**
+ * 将文本中的中文周次数字替换为阿拉伯数字
+ * 例如："第十周" -> "第10周"，"第十八周" -> "第18周"
+ */
+function replaceChineseWeekNumbers(text: string): string {
+  // 匹配"第X周"中的中文数字X（优先匹配双字如"十八"再匹配单字如"十"）
+  return text.replace(/第(十[一二三四五六七八九]|二十|[一二三四五六七八九十])周/g, (match, cn) => {
+    const num = chineseToNumber(cn);
+    return num !== null ? `第${num}周` : match;
+  });
+}
+
+/**
  * 解析星期几，如 "周一" -> 1, "周二" -> 2
  */
 function parseDayOfWeek(dayStr: string): number | null {
@@ -185,7 +210,10 @@ function parseScheduleText(
   // 一个单元格可能包含多个课程（用换行分隔）
   const courseTexts = processedText.split(/\n+/).map(t => t.trim()).filter(t => t);
   
-  for (const courseText of courseTexts) {
+  for (let courseText of courseTexts) {
+    // 预处理：将中文周次数字替换为阿拉伯数字（如"第十周" -> "第10周"）
+    courseText = replaceChineseWeekNumbers(courseText);
+
     // 使用◇或◊分隔符分割（支持全角和半角）
     const parts = courseText.split(/[◇◊]/).map(p => p.trim());
     
@@ -284,6 +312,26 @@ function parseScheduleText(
           // 继续后续解析流程（周次解析、创建记录等）
           // 注意：这种格式通常没有classes字段，所以classes保持为空
         }
+      } else if (parts[3] && /\d+[−-]\d+节/.test(parts[3]) && (parts[3].includes('{') || parts[3].includes('}'))) {
+        // 格式：课程名◇部门/学院◇教师◇节次{周次}
+        // 例如：C语言考试◇信息学院◇马静◇6-9节{第十周}
+        courseName = parts[0].trim();
+        teacher = parts[2] ? parts[2].trim() : '';
+        classes = parts.length > 4 ? parts.slice(4).join(';').trim() : '';
+
+        // 从parts[3]提取节次
+        const periodMatch = parts[3].match(/(\d+)[−-](\d+)节/);
+        if (periodMatch) {
+          periodStr = `第${periodMatch[1]}-${periodMatch[2]}节`;
+        }
+
+        // 从parts[3]提取周次
+        const weekMatch = parts[3].match(/\{([^}]+)\}/);
+        if (weekMatch) {
+          weekStr = weekMatch[1].trim();
+        }
+
+        console.log(`[部门格式] 匹配成功: 课程="${courseName}", 教师="${teacher}", 节次="${periodStr}", 周次="${weekStr}"`);
       } else {
         // 继续标准解析流程（标准格式，没有特殊规则匹配）
         courseName = parts[0].trim();
@@ -447,7 +495,7 @@ function parseScheduleText(
         periodStr = `第${periodMatch[1]}-${periodMatch[2]}节`;
       }
     }
-    
+
     // 解析周次范围（支持多种格式，包括全角减号、多个范围等）
     // 同时提取双周标记（如：{8-16周(双)}）
     let isBiweekly = false; // 是否为双周课程
